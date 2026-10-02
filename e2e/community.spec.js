@@ -60,7 +60,7 @@ test('registered member publishes media and replies through the real API', async
   await page.getByRole('button', { name: '我已安全保存' }).click()
 
   await page.getByRole('button', { name: '发布新帖' }).click()
-  await page.getByLabel('分享此刻的想法').fill(postBody)
+  await page.getByLabel('正文').fill(postBody)
   await page.locator('input[type="file"]').setInputFiles({
     name: 'e2e-pixel.png',
     mimeType: 'image/png',
