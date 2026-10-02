@@ -1,0 +1,85 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const samplePost = () => ({ id:'p-test', author:{id:'u-2',name:'林野',handle:'linye'}, age:'刚刚', content:'组件交互测试动态', comments:1,reposts:2,likes:3,views:4,liked:false,bookmarked:false })
+const api = vi.hoisted(() => ({
+  feed:vi.fn(), profile:vi.fn(), categories:vi.fn(), search:vi.fn(), bookmarks:vi.fn(), notifications:vi.fn(), adminReview:vi.fn(),
+  like:vi.fn(), repost:vi.fn(), bookmark:vi.fn(), follow:vi.fn(), detail:vi.fn(), comments:vi.fn(), updateProfile:vi.fn(),
+  login:vi.fn(), register:vi.fn(), logout:vi.fn(), createPost:vi.fn(), comment:vi.fn(), readNotifications:vi.fn(), moderate:vi.fn(), report:vi.fn(),
+  conversations:vi.fn(), createConversation:vi.fn(), messages:vi.fn(), sendMessage:vi.fn(), events:vi.fn(), tags:vi.fn(), adminUsers:vi.fn(), adminContent:vi.fn(), setUserStatus:vi.fn(), createCategory:vi.fn(), deleteCategory:vi.fn(), createTag:vi.fn(), deleteTag:vi.fn(),
+  profileById:vi.fn(),followers:vi.fn(),following:vi.fn(),block:vi.fn(),followCategory:vi.fn(),sessions:vi.fn(),revokeSession:vi.fn(),markConversationRead:vi.fn(),leaveConversation:vi.fn(),homepage:vi.fn(),adminHomepage:vi.fn(),updateHomepage:vi.fn()
+}))
+vi.mock('../src/api.js', async importOriginal => ({ ...(await importOriginal()), api }))
+import App from '../src/App.vue'
+
+async function render({ authenticated=false }={}) {
+  if(authenticated) sessionStorage.setItem('fanbbs_user',JSON.stringify({id:'u-1',handle:'tester',name:'测试者',role:'member'}))
+  const wrapper=mount(App,{attachTo:document.body});await flushPromises();return wrapper
+}
+
+beforeEach(()=>{
+  vi.clearAllMocks();sessionStorage.clear();localStorage.clear();history.replaceState({},'','#home')
+  vi.stubGlobal('confirm',vi.fn(()=>true));vi.stubGlobal('prompt',vi.fn(()=> '足够长的审核测试理由'))
+  api.feed.mockResolvedValue({data:[samplePost()]});api.profile.mockResolvedValue({data:{id:'u-1',handle:'tester',display_name:'测试者',role:'member'}})
+  api.categories.mockResolvedValue({data:[{id:'cat-1',name:'技术'}]});api.search.mockResolvedValue({data:{posts:[samplePost()],users:[{id:'u-2',handle:'linye',display_name:'林野',following:false}],tags:[{id:'tag-1',name:'城市'}]}})
+  api.bookmarks.mockResolvedValue({data:[{...samplePost(),bookmarked:true}]});api.notifications.mockResolvedValue({data:[]});api.comments.mockResolvedValue({data:[]});api.detail.mockResolvedValue({data:samplePost()})
+  api.bookmark.mockResolvedValue({data:{changed:true}});api.follow.mockResolvedValue({data:{changed:true}});api.logout.mockResolvedValue({data:{}})
+  api.conversations.mockResolvedValue({data:[{id:'cnv-1',title:'林野',updated_at:'刚刚',last_message:{content:'你好'}}]});api.messages.mockResolvedValue({data:[{id:'msg-1',sender_id:'u-2',content:'你好',created_at:'刚刚'}]});api.sendMessage.mockResolvedValue({data:{id:'msg-2',sender_id:'u-1',content:'收到',created_at:'刚刚'}})
+  api.events.mockResolvedValue({data:[],page:{next_cursor:''}})
+  api.tags.mockResolvedValue({data:[{id:'tag-1',name:'城市',slug:'city'}]});api.adminUsers.mockResolvedValue({data:[{id:'u-2',display_name:'林野',handle:'linye',role:'member',status:'active'}]});api.adminContent.mockResolvedValue({data:[]});api.setUserStatus.mockResolvedValue({data:{status:'suspended'}})
+  api.sessions.mockResolvedValue({data:[{id:'sess-1',current:true,created_at:'今天'}]});api.profileById.mockResolvedValue({data:{id:'u-2',name:'林野',handle:'linye',bio:'简介',follower_count:1,following_count:2,post_count:3,following:false,blocked_by_me:false}});api.followers.mockResolvedValue({data:[]});api.following.mockResolvedValue({data:[]});api.block.mockResolvedValue({data:{changed:true}});api.followCategory.mockResolvedValue({data:{changed:true}});api.revokeSession.mockResolvedValue({data:{revoked:true}})
+  api.markConversationRead.mockResolvedValue({data:{read:true}});api.leaveConversation.mockResolvedValue({data:{left:true}});api.homepage.mockResolvedValue({data:{payload:{carousel:[],announcements:[]}}});api.adminHomepage.mockResolvedValue({data:{version:1,status:'published',payload:{carousel:[],announcements:[]}}})
+})
+
+describe('FanBBS core interactions',()=>{
+  it('separates server errors from the network-only demo fallback',async()=>{
+    api.feed.mockRejectedValueOnce(Object.assign(new Error('服务校验失败'),{code:'validation_failed'}));const wrapper=await render()
+    expect(wrapper.text()).toContain('动态加载失败');expect(wrapper.text()).not.toContain('本地预览数据');wrapper.unmount()
+    api.feed.mockRejectedValueOnce(Object.assign(new Error('无法连接'),{code:'network_error'}));const offline=await render();expect(offline.text()).toContain('本地预览数据');offline.unmount()
+  })
+  it('guards rapid likes and applies the server count',async()=>{
+    let resolveLike;api.like.mockReturnValue(new Promise(r=>{resolveLike=r}));const wrapper=await render({authenticated:true})
+    const like=wrapper.findAll('article.post footer button')[2];await like.trigger('click');await like.trigger('click');expect(api.like).toHaveBeenCalledTimes(1)
+    resolveLike({data:{liked:true,like_count:4}});await flushPromises();expect(like.text()).toContain('4');wrapper.unmount()
+  })
+  it('filters from a category and exposes searched users, follows and tags',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.findAll('aside nav button').find(b=>b.text().includes('发现')).trigger('click');await flushPromises()
+    await wrapper.find('.chips button').trigger('click');await flushPromises();expect(api.feed).toHaveBeenLastCalledWith('recommended',{categoryId:'cat-1'})
+    await wrapper.findAll('aside nav button').find(b=>b.text().includes('发现')).trigger('click');await flushPromises();await wrapper.find('#discover-q').setValue('技术');await wrapper.find('.discover-search').trigger('submit');await flushPromises();expect(api.search).toHaveBeenCalledWith('技术');expect(wrapper.text()).toContain('用户');expect(wrapper.text()).toContain('# 城市')
+    await wrapper.find('.user-result .outline').trigger('click');await flushPromises();expect(api.follow).toHaveBeenCalledWith('u-2',false);wrapper.unmount()
+  })
+  it('returns to the originating section and removes an unbookmarked saved row',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.findAll('aside nav button').find(b=>b.text().includes('收藏')).trigger('click');await flushPromises()
+    await wrapper.find('.compact-result>button:first-child').trigger('click');await flushPromises();expect(location.hash).toBe('#post-p-test')
+    await wrapper.find('.back').trigger('click');await flushPromises();expect(location.hash).toBe('#saved');expect(wrapper.text()).toContain('我的收藏')
+    await wrapper.find('.compact-result .outline').trigger('click');await flushPromises();expect(wrapper.text()).not.toContain('组件交互测试动态');wrapper.unmount()
+  })
+  it('clears an unverified cached identity',async()=>{
+    api.profile.mockRejectedValueOnce(Object.assign(new Error('已停用'),{status:401,code:'authentication_required'}));const wrapper=await render({authenticated:true})
+    expect(wrapper.text()).toContain('登录');expect(sessionStorage.getItem('fanbbs_user')).toBeNull();wrapper.unmount()
+  })
+  it('opens a private conversation and appends a sent message',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.findAll('aside nav button').find(b=>b.text().includes('消息')).trigger('click');await flushPromises()
+    await wrapper.findAll('.message-tabs button')[1].trigger('click');await flushPromises();await wrapper.find('.conversation-row').trigger('click');await flushPromises()
+    await wrapper.find('#private-message').setValue('收到');await wrapper.find('.message-compose').trigger('submit');await flushPromises()
+    expect(api.sendMessage).toHaveBeenCalledWith('cnv-1','收到');expect(wrapper.findAll('.message-bubble')).toHaveLength(2);wrapper.unmount()
+  })
+  it('shows admin user operations only after verified role lookup',async()=>{
+    api.profile.mockResolvedValueOnce({data:{id:'u-1',handle:'admin',display_name:'管理员',role:'admin'}});const wrapper=await render({authenticated:true})
+    await wrapper.find('.user-chip').trigger('click');await flushPromises();await wrapper.find('.admin-link').trigger('click');await flushPromises()
+    await wrapper.findAll('.admin-tabs button')[1].trigger('click');await flushPromises();expect(wrapper.text()).toContain('林野 @linye')
+    await wrapper.find('.review-item .outline').trigger('click');await flushPromises();expect(api.setUserStatus).toHaveBeenCalledWith('u-2','suspended','足够长的审核测试理由');wrapper.unmount()
+  })
+  it('follows conversation and message cursors and starts reconnect polling',async()=>{
+    api.conversations.mockResolvedValueOnce({data:[{id:'cnv-1',title:'一号'}],page:{next_cursor:'conversations-next'}}).mockResolvedValueOnce({data:[{id:'cnv-2',title:'二号'}],page:{next_cursor:''}})
+    api.messages.mockResolvedValueOnce({data:[{id:'msg-new',sender_id:'u-2',content:'新',created_at:'刚刚'}],page:{next_cursor:'messages-next'}}).mockResolvedValueOnce({data:[{id:'msg-old',sender_id:'u-2',content:'旧',created_at:'昨天'}],page:{next_cursor:''}})
+    const wrapper=await render({authenticated:true});await wrapper.findAll('aside nav button').find(b=>b.text().includes('消息')).trigger('click');await flushPromises();await wrapper.findAll('.message-tabs button')[1].trigger('click');await flushPromises()
+    expect(api.events).toHaveBeenCalledWith('');await wrapper.find('.load-more').trigger('click');await flushPromises();expect(api.conversations).toHaveBeenLastCalledWith('conversations-next')
+    await wrapper.findAll('.conversation-row')[0].trigger('click');await flushPromises();await wrapper.find('.load-more').trigger('click');await flushPromises();expect(api.messages).toHaveBeenLastCalledWith('cnv-1','messages-next');expect(wrapper.findAll('.message-bubble')).toHaveLength(2);wrapper.unmount()
+  })
+  it('loads a public profile and applies follow/block controls',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.find('.author').trigger('click');await flushPromises();expect(api.profileById).toHaveBeenCalledWith('u-2');expect(location.hash).toBe('#user-u-2')
+    await wrapper.find('.profile-actions .primary').trigger('click');await flushPromises();expect(api.follow).toHaveBeenCalledWith('u-2',false)
+    await wrapper.findAll('.profile-actions button')[2].trigger('click');await flushPromises();expect(api.block).toHaveBeenCalledWith('u-2',false);wrapper.unmount()
+  })
+})
