@@ -19,3 +19,23 @@ test('approved responsive shell and login gate are usable', async ({ page }, tes
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath(`fanbbs-${testInfo.project.name}.png`), fullPage: true })
 })
+
+test('synthetic registration displays one-time recovery codes', async ({ page }, testInfo) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: '注册' }).first().click()
+  const suffix = testInfo.project.name.replace(/[^a-z0-9]/g, '')
+  await page.getByLabel('用户名').fill(`e2e_${suffix}`)
+  await page.getByLabel('邮箱').fill(`e2e_${suffix}@example.test`)
+  await page.getByLabel('显示名称').fill(`E2E ${suffix}`)
+  await page.getByLabel('密码').fill('e2e-secure-pass-1')
+  await page.getByRole('button', { name: '注册' }).last().click()
+  await expect(page.getByText('恢复码只显示这一次，请离线安全保存')).toBeVisible()
+  await expect(page.locator('.recovery-codes code')).toHaveCount(8)
+})
+
+test('local shop clearly excludes payment', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop rail destination')
+  await page.goto('/')
+  await page.getByRole('button', { name: '商城' }).click()
+  await expect(page.getByText('这里只创建不含付款的本地履约订单；支付、现金钱包、VIP 和外部物流均未启用。')).toBeVisible()
+})
