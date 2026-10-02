@@ -42,11 +42,14 @@ jobs:
           api_pid=$!
           trap 'kill "$api_pid" 2>/dev/null || true' EXIT
           for n in $(seq 1 80); do curl -fsS http://127.0.0.1:8080/healthz && break; sleep .25; done
+          curl -fsS 'http://127.0.0.1:8080/api/v1/posts?feed=recommend&limit=2' > /dev/null
           npm run test:e2e
       - name: Upload browser screenshots and traces
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fanbbs-browser-results
-          path: test-results
+          path: |
+            test-results
+            ${{ runner.temp }}/e2e-api.log
           if-no-files-found: error
