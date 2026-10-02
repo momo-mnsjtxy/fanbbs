@@ -4,7 +4,7 @@ test('approved responsive shell and login gate are usable', async ({ page }, tes
   await page.goto('/')
   await expect(page.getByText('后端暂不可用')).toHaveCount(0)
   await expect(page.getByText('动态加载失败')).toHaveCount(0)
-  await expect(page.getByText('在城市醒来之前，找到属于清晨的安静')).toBeVisible()
+  await expect(page.getByText('清晨五点半，路灯还没有熄灭。')).toBeVisible()
   await expect(page.getByRole('button', { name: 'FanBBS' })).toBeVisible()
   await expect(page.getByRole('tab', { name: '推荐' })).toBeVisible()
   if (testInfo.project.name === 'mobile') {
