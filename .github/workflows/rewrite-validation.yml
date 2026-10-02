@@ -18,6 +18,15 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: momo-mnsjtxy/fanbbsapi
+          ref: ci/rewrite-validation
+          path: backend
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.5'
+          cache-dependency-path: backend/go.sum
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -28,4 +37,16 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Browser interaction checks
-        run: npm run test:e2e
+        run: |
+          (cd backend && FANBBS_DB="$RUNNER_TEMP/e2e.db" FANBBS_BLOB_DIR="$RUNNER_TEMP/e2e-blobs" FANBBS_ADDR=127.0.0.1:8080 go run ./cmd/api >"$RUNNER_TEMP/e2e-api.log" 2>&1) &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for n in $(seq 1 80); do curl -fsS http://127.0.0.1:8080/healthz && break; sleep .25; done
+          npm run test:e2e
+      - name: Upload browser screenshots and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fanbbs-browser-results
+          path: test-results
+          if-no-files-found: error

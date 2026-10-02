@@ -9,6 +9,6 @@ export default defineConfig({
   webServer: { command: 'npm run dev', url: 'http://127.0.0.1:4173', reuseExistingServer: false, timeout: 60_000 },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile', use: { ...devices['iPhone 13'] } }
+    { name: 'mobile', use: { ...devices['iPhone 13'], browserName: 'chromium' } }
   ]
 })
