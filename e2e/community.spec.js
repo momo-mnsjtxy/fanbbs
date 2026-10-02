@@ -34,15 +34,19 @@ test('synthetic registration displays one-time recovery codes', async ({ page },
 })
 
 test('local shop clearly excludes payment', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop', 'desktop rail destination')
-  await page.goto('/')
-  await page.getByRole('button', { name: '商城' }).click()
+  if (testInfo.project.name === 'desktop') {
+    await page.goto('/')
+    await page.getByRole('button', { name: '商城' }).click()
+  } else {
+    // The approved mobile shell intentionally keeps exactly four primary tabs;
+    // secondary destinations remain deep-linkable.
+    await page.goto('/#shop')
+  }
   await expect(page.getByText('这里只创建不含付款的本地履约订单；支付、现金钱包、VIP 和外部物流均未启用。')).toBeVisible()
 })
 
 test('registered member publishes media and replies through the real API', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop', 'one end-to-end mutation pass is sufficient')
-  const handle = `flow_${Date.now()}`
+  const handle = `flow_${testInfo.project.name}_${Date.now()}`
   const postBody = `真实链路媒体帖 ${handle}`
   const replyBody = `真实链路回复 ${handle}`
 
