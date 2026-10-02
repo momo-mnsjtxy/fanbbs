@@ -73,6 +73,8 @@ export const api = {
   like: (id, liked) => request(`/posts/${encodeURIComponent(id)}/reactions/like`, { method: liked ? 'DELETE' : 'PUT' }),
   repost: id => request(`/posts/${encodeURIComponent(id)}/reposts`, { method: 'PUT' })
   ,register: (handle, email, displayName, password) => request('/auth/register', { method: 'POST', body: JSON.stringify({ handle, email, display_name: displayName, password }) })
+  ,recover: (account,recoveryCode,newPassword) => request('/auth/recover',{method:'POST',body:JSON.stringify({account,recovery_code:recoveryCode,new_password:newPassword})})
+  ,rotateRecoveryCodes: currentPassword => request('/me/recovery-codes/rotate',{method:'POST',body:JSON.stringify({current_password:currentPassword})})
   ,profile: () => request('/me')
   ,updateProfile: input => request('/me/profile', { method: 'PATCH', body: JSON.stringify(input) })
   ,categories: () => request('/categories')
@@ -94,11 +96,15 @@ export const api = {
   ,report: (targetType, targetId, reason) => request('/reports', { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ target_type: targetType, target_id: targetId, reason }) })
   ,updatePost: async (id, version, content) => { const r = await request(`/posts/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'If-Match': `"${version}"` }, body: JSON.stringify({ content }) }); return { ...r, data: normalizePost(r.data) } }
   ,deletePost: (id, version) => request(`/posts/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
+  ,postRevisions: id => request(`/posts/${encodeURIComponent(id)}/revisions?limit=50`)
+  ,activity: () => request('/me/activity?limit=50')
   ,updateComment: async (postId, commentId, version, content) => { const r = await request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'PATCH', headers: { 'If-Match': `"${version}"` }, body: JSON.stringify({ content }) }); return { ...r, data: normalizeComment(r.data) } }
   ,deleteComment: (postId, commentId, version) => request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
   ,likeComment: (postId, commentId, liked) => request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/reactions/like`, { method: liked ? 'DELETE' : 'PUT' })
   ,adminReview: () => request('/admin/reports?status=open&limit=30')
   ,moderate: (id, decision, reason) => request(`/admin/reports/${encodeURIComponent(id)}/decision`, { method: 'POST', body: JSON.stringify({ decision, reason }) })
+  ,moderatePost: (id,decision,reason) => request(`/admin/posts/${encodeURIComponent(id)}/moderation`,{method:'POST',body:JSON.stringify({decision,reason})})
+  ,postControls: (id,input) => request(`/admin/posts/${encodeURIComponent(id)}/controls`,{method:'PATCH',body:JSON.stringify(input)})
   ,adminUsers: (status='active') => request(`/admin/users?status=${encodeURIComponent(status)}&limit=50`)
   ,setUserStatus: (id,status,reason) => request(`/admin/users/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason }) })
   ,adminContent: ({status='published',type='',q=''}={}) => request(`/admin/content?status=${encodeURIComponent(status)}&type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&limit=50`)
