@@ -72,7 +72,7 @@ test('registered member publishes media and replies through the real API', async
   await expect(published.getByRole('img', { name: 'e2e-pixel.png' })).toBeVisible()
 
   await published.locator('.post-content').click()
-  await expect(page.getByRole('heading', { name: '帖子详情' })).toBeVisible()
+  await expect(page.locator('.detail-title')).toBeVisible()
   await expect(page.locator('.detail-post').getByRole('img', { name: 'e2e-pixel.png' })).toBeVisible()
   await page.getByLabel('加入对话').fill(replyBody)
   await page.getByRole('button', { name: '回复', exact: true }).click()
