@@ -100,7 +100,7 @@ export const api = {
   ,notifications: (cursor='') => request(`/notifications?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
   ,readNotifications: ids => request('/notifications/read', { method: 'PUT', body: JSON.stringify({ ids }) })
   ,report: (targetType, targetId, reason) => request('/reports', { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ target_type: targetType, target_id: targetId, reason }) })
-  ,updatePost: async (id, version, content) => { const r = await request(`/posts/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'If-Match': `"${version}"` }, body: JSON.stringify({ content }) }); return { ...r, data: normalizePost(r.data) } }
+  ,updatePost: async (id, version, input) => { const update = typeof input === 'string' ? { content: input } : input; const r = await request(`/posts/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'If-Match': `"${version}"` }, body: JSON.stringify(update) }); return { ...r, data: normalizePost(r.data) } }
   ,deletePost: (id, version) => request(`/posts/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
   ,postRevisions: id => request(`/posts/${encodeURIComponent(id)}/revisions?limit=50`)
   ,activity: () => request('/me/activity?limit=50')
@@ -111,7 +111,7 @@ export const api = {
   ,moderate: (id, decision, reason) => request(`/admin/reports/${encodeURIComponent(id)}/decision`, { method: 'POST', body: JSON.stringify({ decision, reason }) })
   ,moderatePost: (id,decision,reason) => request(`/admin/posts/${encodeURIComponent(id)}/moderation`,{method:'POST',body:JSON.stringify({decision,reason})})
   ,postControls: (id,input) => request(`/admin/posts/${encodeURIComponent(id)}/controls`,{method:'PATCH',body:JSON.stringify(input)})
-  ,adminUsers: (status='active') => request(`/admin/users?status=${encodeURIComponent(status)}&limit=50`)
+  ,adminUsers: ({status='',role='',q='',cursor=''}={}) => { const params=new URLSearchParams({limit:'50'});if(status)params.set('status',status);if(role)params.set('role',role);if(q)params.set('q',q);if(cursor)params.set('cursor',cursor);return request(`/admin/users?${params}`) }
   ,setUserStatus: (id,status,reason) => request(`/admin/users/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason }) })
   ,adminContent: ({status='published',type='',q=''}={}) => request(`/admin/content?status=${encodeURIComponent(status)}&type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&limit=50`)
   ,createCategory: input => request('/admin/categories', { method:'POST', body:JSON.stringify(input) })
