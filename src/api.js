@@ -66,16 +66,19 @@ async function request(path, options = {}, retried = false) {
 export const api = {
   feed: async (feed = 'recommended', filters = {}, cursor = '') => { const value = feed === 'recommended' ? 'recommend' : feed; const params=new URLSearchParams({feed:value,limit:'20'});if(filters.categoryId)params.set('category_id',filters.categoryId);if(filters.tagId)params.set('tag_id',filters.tagId);if(cursor)params.set('cursor',cursor);const r = await request(`/posts?${params}`); return { ...r, data: (r.data || []).map(normalizePost) } },
   login: (identity, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ identity, password }) }),
-  createPost: async (content, mediaIds = []) => { const r = await request('/posts', { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ content, visibility: 'public', media_ids: mediaIds }) }); return { ...r, data: normalizePost(r.data) } },
+  createPost: async (input, mediaIds = []) => { const post = typeof input === 'string' ? { content: input, visibility: 'public', media_ids: mediaIds } : input; const r = await request('/posts', { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify(post) }); return { ...r, data: normalizePost(r.data) } },
   detail: async id => { const r = await request(`/posts/${encodeURIComponent(id)}`); return { ...r, data: normalizePost(r.data) } },
   comments: async (id,cursor='') => { const r = await request(`/posts/${encodeURIComponent(id)}/comments?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`); return { ...r, data: (r.data || []).map(normalizeComment) } },
-  comment: async (id, content) => { const r = await request(`/posts/${encodeURIComponent(id)}/comments`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ content }) }); return { ...r, data: normalizeComment(r.data) } },
+  comment: async (id, content, parentId = '') => { const r = await request(`/posts/${encodeURIComponent(id)}/comments`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ content, ...(parentId ? { parent_id: parentId } : {}) }) }); return { ...r, data: normalizeComment(r.data) } },
+  reply: async (postId, commentId, content) => { const r = await request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/replies`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ content }) }); return { ...r, data: normalizeComment(r.data) } },
   like: (id, liked) => request(`/posts/${encodeURIComponent(id)}/reactions/like`, { method: liked ? 'DELETE' : 'PUT' }),
-  repost: id => request(`/posts/${encodeURIComponent(id)}/reposts`, { method: 'PUT' })
+  repost: (id, reposted = false) => request(`/posts/${encodeURIComponent(id)}/reposts`, { method: reposted ? 'DELETE' : 'PUT' })
   ,register: (handle, email, displayName, password) => request('/auth/register', { method: 'POST', body: JSON.stringify({ handle, email, display_name: displayName, password }) })
   ,recover: (account,recoveryCode,newPassword) => request('/auth/recover',{method:'POST',body:JSON.stringify({account,recovery_code:recoveryCode,new_password:newPassword})})
   ,rotateRecoveryCodes: currentPassword => request('/me/recovery-codes/rotate',{method:'POST',body:JSON.stringify({current_password:currentPassword})})
   ,profile: () => request('/me')
+  ,changePassword: (currentPassword,newPassword) => request('/me/password', { method:'PUT', body:JSON.stringify({current_password:currentPassword,new_password:newPassword}) })
+  ,deactivateAccount: () => request('/me/account', { method:'DELETE' })
   ,updateProfile: input => request('/me/profile', { method: 'PATCH', body: JSON.stringify(input) })
   ,categories: () => request('/categories')
   ,tags: () => request('/tags')

@@ -5,11 +5,11 @@ const samplePost = () => ({ id:'p-test', author:{id:'u-2',name:'林野',handle:'
 const api = vi.hoisted(() => ({
   feed:vi.fn(), profile:vi.fn(), categories:vi.fn(), search:vi.fn(), bookmarks:vi.fn(), notifications:vi.fn(), adminReview:vi.fn(),
   like:vi.fn(), repost:vi.fn(), bookmark:vi.fn(), follow:vi.fn(), detail:vi.fn(), comments:vi.fn(), updateProfile:vi.fn(),
-  login:vi.fn(), register:vi.fn(), logout:vi.fn(), createPost:vi.fn(), comment:vi.fn(), readNotifications:vi.fn(), moderate:vi.fn(), report:vi.fn(),
+  login:vi.fn(), register:vi.fn(), logout:vi.fn(), createPost:vi.fn(), comment:vi.fn(), reply:vi.fn(), readNotifications:vi.fn(), moderate:vi.fn(), report:vi.fn(),
   conversations:vi.fn(), createConversation:vi.fn(), messages:vi.fn(), sendMessage:vi.fn(), events:vi.fn(), tags:vi.fn(), adminUsers:vi.fn(), adminContent:vi.fn(), setUserStatus:vi.fn(), createCategory:vi.fn(), deleteCategory:vi.fn(), createTag:vi.fn(), deleteTag:vi.fn(),
   profileById:vi.fn(),followers:vi.fn(),following:vi.fn(),block:vi.fn(),followCategory:vi.fn(),sessions:vi.fn(),revokeSession:vi.fn(),markConversationRead:vi.fn(),leaveConversation:vi.fn(),homepage:vi.fn(),adminHomepage:vi.fn(),updateHomepage:vi.fn()
   ,products:vi.fn(),productTypes:vi.fn(),cart:vi.fn(),setCart:vi.fn(),createOrder:vi.fn(),orders:vi.fn(),cancelOrder:vi.fn(),gamification:vi.fn(),pointEvents:vi.fn(),tasks:vi.fn(),ranks:vi.fn(),frames:vi.fn(),checkIn:vi.fn(),selectFrame:vi.fn()
-  ,recover:vi.fn(),rotateRecoveryCodes:vi.fn()
+  ,recover:vi.fn(),rotateRecoveryCodes:vi.fn(),changePassword:vi.fn(),deactivateAccount:vi.fn()
   ,abandonMedia:vi.fn()
 }))
 vi.mock('../src/api.js', async importOriginal => ({ ...(await importOriginal()), api }))
@@ -34,6 +34,8 @@ beforeEach(()=>{
   api.markConversationRead.mockResolvedValue({data:{read:true}});api.leaveConversation.mockResolvedValue({data:{left:true}});api.homepage.mockResolvedValue({data:{payload:{carousel:[],announcements:[]}}});api.adminHomepage.mockResolvedValue({data:{version:1,status:'published',payload:{carousel:[],announcements:[]}}})
   api.productTypes.mockResolvedValue({data:[]});api.products.mockResolvedValue({data:[{id:'prod-1',name:'社区贴纸',description:'本地履约',inventory:3}]});api.cart.mockResolvedValue({data:[]});api.setCart.mockResolvedValue({data:{product:{id:'prod-1',name:'社区贴纸'},quantity:1}});api.createOrder.mockResolvedValue({data:{id:'ord-1',status:'created',items:[{name:'社区贴纸',quantity:1}]}});api.orders.mockResolvedValue({data:[]});api.gamification.mockResolvedValue({data:{level_name:'新芽',title:'成员',points_balance:10,rank:2}});api.pointEvents.mockResolvedValue({data:[]});api.tasks.mockResolvedValue({data:[]});api.ranks.mockResolvedValue({data:[]});api.frames.mockResolvedValue({data:[]});api.checkIn.mockResolvedValue({data:{}})
   api.register.mockResolvedValue({data:{access_token:'a',refresh_token:'r',user:{id:'u-new',handle:'new',display_name:'新用户'},recovery_codes:['AAAAA-BBBBB-CCCCC-DDDDD']}});api.recover.mockResolvedValue({data:{changed:true,recovery_codes:['EEEEE-FFFFF-GGGGG-HHHHH']}});api.rotateRecoveryCodes.mockResolvedValue({data:{recovery_codes:['IIIII-JJJJJ-KKKKK-LLLLL']}})
+  api.createPost.mockResolvedValue({data:samplePost()});api.comment.mockResolvedValue({data:{id:'c-new',depth:0,author:{id:'u-1',name:'测试者',handle:'tester'},content:'回复',age:'刚刚'}});api.reply.mockResolvedValue({data:{id:'c-reply',parent_id:'c-root',depth:1,author:{id:'u-1',name:'测试者',handle:'tester'},content:'嵌套回复',age:'刚刚'}});api.repost.mockResolvedValue({data:{changed:true}});api.report.mockResolvedValue({data:{id:'report-1'}})
+  api.changePassword.mockResolvedValue({data:{changed:true}});api.deactivateAccount.mockResolvedValue({data:{deactivated:true}})
   api.abandonMedia.mockResolvedValue({})
 })
 
@@ -113,5 +115,26 @@ describe('FanBBS core interactions',()=>{
     const picker=wrapper.find('.media-picker input');const files=[new File(['first'],'first.png',{type:'image/png'}),new File(['second'],'second.png',{type:'image/png'})];Object.defineProperty(picker.element,'files',{value:files,configurable:true});await picker.trigger('change')
     vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce({status:201,ok:true,json:async()=>({data:{id:'media-one'}})}).mockResolvedValueOnce({status:201,ok:true,json:async()=>({data:{id:'media-two'}})}))
     await wrapper.find('.composer .primary').trigger('click');await flushPromises();expect(api.abandonMedia.mock.calls.map(call=>call[0])).toEqual(['media-one','media-two']);expect(wrapper.find('#draft').element.value).toBe('稍后重试的草稿');expect(wrapper.findAll('.selected-media li')).toHaveLength(2);wrapper.unmount();vi.unstubAllGlobals()
+  })
+  it('publishes the complete post contract selected in the composer',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.find('.top-actions [aria-label="发布"]').trigger('click');await flushPromises()
+    expect(api.categories).toHaveBeenCalled();expect(api.tags).toHaveBeenCalled();await wrapper.find('#compose-title-field').setValue('一篇完整文章');await wrapper.find('#compose-summary').setValue('文章摘要');await wrapper.find('#draft').setValue('文章正文');await wrapper.find('#compose-kind').setValue('image');await wrapper.find('#compose-category').setValue('cat-1');await wrapper.find('#compose-visibility').setValue('followers');await wrapper.find('.tag-picker input').setValue(true)
+    await wrapper.find('.composer-form').trigger('submit');await flushPromises();expect(api.createPost).toHaveBeenCalledWith({content:'文章正文',title:'一篇完整文章',summary:'文章摘要',kind:'image',category_id:'cat-1',tag_ids:['tag-1'],media_ids:[],visibility:'followers'});wrapper.unmount()
+  })
+  it('changes the password with confirmation and surfaces account errors',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.find('.user-chip').trigger('click');await flushPromises();const form=wrapper.find('.security-form');await form.find('#current-password').setValue('old-password');await form.find('#account-new-password').setValue('new-password');await form.find('#confirm-new-password').setValue('different-password');await form.trigger('submit');expect(api.changePassword).not.toHaveBeenCalled();expect(wrapper.text()).toContain('两次输入的新密码不一致')
+    await form.find('#confirm-new-password').setValue('new-password');api.changePassword.mockRejectedValueOnce(new Error('当前密码不正确'));await form.trigger('submit');await flushPromises();expect(confirm).toHaveBeenCalledWith(expect.stringContaining('其他设备'));expect(api.changePassword).toHaveBeenCalledWith('old-password','new-password');expect(wrapper.text()).toContain('当前密码不正确');wrapper.unmount()
+  })
+  it('deactivates the account only after a clear confirmation and clears the session',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.find('.user-chip').trigger('click');await flushPromises();await wrapper.find('.danger-zone .danger-button').trigger('click');await flushPromises();expect(confirm).toHaveBeenCalledWith(expect.stringContaining('立即退出'));expect(api.deactivateAccount).toHaveBeenCalledTimes(1);expect(sessionStorage.getItem('fanbbs_user')).toBeNull();expect(wrapper.text()).toContain('登录');wrapper.unmount()
+  })
+  it('renders reply depth, posts through the reply endpoint and reports comments',async()=>{
+    api.comments.mockResolvedValueOnce({data:[{id:'c-root',depth:0,author:{id:'u-2',name:'林野',handle:'linye'},content:'根回复',age:'刚刚',like_count:0},{id:'c-child',parent_id:'c-root',depth:1,author:{id:'u-3',name:'木棉',handle:'mumian'},content:'子回复',age:'刚刚',like_count:0}]});const wrapper=await render({authenticated:true});await wrapper.find('.post-content').trigger('click');await flushPromises();expect(wrapper.find('[data-depth="1"]').exists()).toBe(true)
+    await wrapper.find('[data-depth="0"] .comment-actions button:nth-child(2)').trigger('click');await wrapper.find('#reply-c-root').setValue('嵌套回复');await wrapper.find('.inline-reply').trigger('submit');await flushPromises();expect(api.reply).toHaveBeenCalledWith('p-test','c-root','嵌套回复');expect(wrapper.findAll('.comment')).toHaveLength(3)
+    const nested=wrapper.findAll('.comment').find(item=>item.text().includes('子回复'));await nested.findAll('.comment-actions button').find(button=>button.text()==='举报').trigger('click');await flushPromises();expect(api.report).toHaveBeenCalledWith('comment','c-child','足够长的审核测试理由');wrapper.unmount()
+  })
+  it('reports a user and toggles repost from both feed state and detail',async()=>{
+    const reposted={...samplePost(),reposted:true,reposts:2};api.feed.mockResolvedValueOnce({data:[reposted]});api.detail.mockResolvedValueOnce({data:{...reposted}});const wrapper=await render({authenticated:true});await wrapper.find('.post-content').trigger('click');await flushPromises();const repostButton=wrapper.findAll('.detail-post footer button')[1];await repostButton.trigger('click');await flushPromises();expect(api.repost).toHaveBeenCalledWith('p-test',true);expect(repostButton.text()).toContain('1')
+    await wrapper.find('.back').trigger('click');await wrapper.find('.author').trigger('click');await flushPromises();await wrapper.find('.report-user').trigger('click');await flushPromises();expect(api.report).toHaveBeenCalledWith('user','u-2','足够长的审核测试理由');wrapper.unmount()
   })
 })
