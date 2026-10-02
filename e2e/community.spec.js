@@ -62,7 +62,7 @@ test('registered member publishes media and replies through the real API', async
     mimeType: 'image/png',
     buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
   })
-  await page.getByRole('button', { name: '发布' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: '发布', exact: true }).click()
   await expect(page.getByRole('button', { name: postBody })).toBeVisible()
   await expect(page.getByRole('img', { name: 'e2e-pixel.png' })).toBeVisible()
 
