@@ -87,11 +87,14 @@ export const api = {
   ,bookmark: (id, marked) => request(`/posts/${encodeURIComponent(id)}/bookmark`, { method: marked ? 'DELETE' : 'PUT' })
   ,follow: (id, following) => request(`/users/${encodeURIComponent(id)}/follow`, { method: following ? 'DELETE' : 'PUT' })
   ,profileById: id => request(`/users/${encodeURIComponent(id)}`)
+  ,profilePosts: async (id,cursor='') => { const r=await request(`/users/${encodeURIComponent(id)}/posts?limit=20${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`); return {...r,data:(r.data||[]).map(normalizePost)} }
+  ,profileComments: async (id,cursor='') => { const r=await request(`/users/${encodeURIComponent(id)}/comments?limit=20${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`); return {...r,data:(r.data||[]).map(normalizeComment)} }
   ,followers: id => request(`/users/${encodeURIComponent(id)}/followers?limit=30`)
   ,following: id => request(`/users/${encodeURIComponent(id)}/following?limit=30`)
   ,block: (id,blocked) => request(`/users/${encodeURIComponent(id)}/block`, { method: blocked?'DELETE':'PUT' })
+  ,blocks: (cursor='') => request(`/me/blocks?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
   ,followCategory: (id,followed) => request(`/categories/${encodeURIComponent(id)}/follow`, { method:followed?'DELETE':'PUT' })
-  ,categoryFollows: () => request('/me/category-follows?limit=50')
+  ,categoryFollows: (cursor='') => request(`/me/category-follows?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
   ,sessions: () => request('/me/sessions')
   ,revokeSession: id => request(`/me/sessions/${encodeURIComponent(id)}`, { method:'DELETE' })
   ,notifications: (cursor='') => request(`/notifications?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
@@ -119,6 +122,7 @@ export const api = {
   ,deleteTag: (id,reason) => request(`/admin/tags/${encodeURIComponent(id)}`, { method:'DELETE', body:JSON.stringify({reason}) })
   ,logout: () => request('/auth/logout', { method: 'POST' })
   ,conversations: async (cursor='') => { const r=await request(`/conversations?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`); const me=JSON.parse(sessionStorage.getItem('fanbbs_user')||'null'); return {...r,data:(r.data||[]).map(c=>({...c,other_user:c.members?.map(m=>m.user).find(u=>u.id!==me?.id),last_message:c.last_message?{...c.last_message,content:c.last_message.body||c.last_message.content}:null}))} }
+  ,conversation: id => request(`/conversations/${encodeURIComponent(id)}`)
   ,createConversation: userId => request('/conversations', { method: 'POST', body: JSON.stringify({ member_ids: [userId] }) })
   ,messages: async (id,cursor='') => { const r=await request(`/conversations/${encodeURIComponent(id)}/messages?limit=50${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`); return {...r,data:(r.data||[]).map(m=>({...m,content:m.body||m.content,sender_id:m.sender_id||m.sender?.id}))} }
   ,sendMessage: async (id, content) => { const r=await request(`/conversations/${encodeURIComponent(id)}/messages`, { method: 'POST', body: JSON.stringify({ body:content, client_message_id: crypto.randomUUID() }) }); return {...r,data:{...r.data,content:r.data.body||r.data.content,sender_id:r.data.sender_id||r.data.sender?.id}} }
@@ -146,12 +150,13 @@ export const api = {
   ,abandonMedia: id => request(`/uploads/${encodeURIComponent(id)}`, { method:'DELETE' })
 }
 
-export async function uploadFile(file, { avatar = false, altText = '' } = {}) {
+export async function uploadFile(file, { avatar = false, cover = false, altText = '' } = {}) {
   const send = async retried => {
     const form = new FormData(); form.append('file', file); form.append('alt_text', altText)
     const token = sessionStorage.getItem('fanbbs_access_token')
     let response
-    try { response = await fetch(`${API_BASE}${avatar ? '/me/avatar' : '/uploads'}`, { method: avatar ? 'PUT' : 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form }) } catch { throw new ApiError('无法连接社区服务', { code: 'network_error' }) }
+    const accountMediaPath = cover ? '/me/cover' : '/me/avatar'
+    try { response = await fetch(`${API_BASE}${avatar || cover ? accountMediaPath : '/uploads'}`, { method: avatar || cover ? 'PUT' : 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form }) } catch { throw new ApiError('无法连接社区服务', { code: 'network_error' }) }
     if (response.status === 401 && !retried && await refreshSession().catch(()=>null)) return send(true)
     const payload = await response.json().catch(()=>({}))
     if (!response.ok) throw normalizeApiError(payload,response.status)
