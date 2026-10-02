@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   login:vi.fn(), register:vi.fn(), logout:vi.fn(), createPost:vi.fn(), comment:vi.fn(), readNotifications:vi.fn(), moderate:vi.fn(), report:vi.fn(),
   conversations:vi.fn(), createConversation:vi.fn(), messages:vi.fn(), sendMessage:vi.fn(), events:vi.fn(), tags:vi.fn(), adminUsers:vi.fn(), adminContent:vi.fn(), setUserStatus:vi.fn(), createCategory:vi.fn(), deleteCategory:vi.fn(), createTag:vi.fn(), deleteTag:vi.fn(),
   profileById:vi.fn(),followers:vi.fn(),following:vi.fn(),block:vi.fn(),followCategory:vi.fn(),sessions:vi.fn(),revokeSession:vi.fn(),markConversationRead:vi.fn(),leaveConversation:vi.fn(),homepage:vi.fn(),adminHomepage:vi.fn(),updateHomepage:vi.fn()
+  ,products:vi.fn(),productTypes:vi.fn(),cart:vi.fn(),setCart:vi.fn(),createOrder:vi.fn(),orders:vi.fn(),cancelOrder:vi.fn(),gamification:vi.fn(),pointEvents:vi.fn(),tasks:vi.fn(),ranks:vi.fn(),frames:vi.fn(),checkIn:vi.fn(),selectFrame:vi.fn()
 }))
 vi.mock('../src/api.js', async importOriginal => ({ ...(await importOriginal()), api }))
 import App from '../src/App.vue'
@@ -29,6 +30,7 @@ beforeEach(()=>{
   api.tags.mockResolvedValue({data:[{id:'tag-1',name:'城市',slug:'city'}]});api.adminUsers.mockResolvedValue({data:[{id:'u-2',display_name:'林野',handle:'linye',role:'member',status:'active'}]});api.adminContent.mockResolvedValue({data:[]});api.setUserStatus.mockResolvedValue({data:{status:'suspended'}})
   api.sessions.mockResolvedValue({data:[{id:'sess-1',current:true,created_at:'今天'}]});api.profileById.mockResolvedValue({data:{id:'u-2',name:'林野',handle:'linye',bio:'简介',follower_count:1,following_count:2,post_count:3,following:false,blocked_by_me:false}});api.followers.mockResolvedValue({data:[]});api.following.mockResolvedValue({data:[]});api.block.mockResolvedValue({data:{changed:true}});api.followCategory.mockResolvedValue({data:{changed:true}});api.revokeSession.mockResolvedValue({data:{revoked:true}})
   api.markConversationRead.mockResolvedValue({data:{read:true}});api.leaveConversation.mockResolvedValue({data:{left:true}});api.homepage.mockResolvedValue({data:{payload:{carousel:[],announcements:[]}}});api.adminHomepage.mockResolvedValue({data:{version:1,status:'published',payload:{carousel:[],announcements:[]}}})
+  api.productTypes.mockResolvedValue({data:[]});api.products.mockResolvedValue({data:[{id:'prod-1',name:'社区贴纸',description:'本地履约',inventory:3}]});api.cart.mockResolvedValue({data:[]});api.setCart.mockResolvedValue({data:{product:{id:'prod-1',name:'社区贴纸'},quantity:1}});api.createOrder.mockResolvedValue({data:{id:'ord-1',status:'created',items:[{name:'社区贴纸',quantity:1}]}});api.orders.mockResolvedValue({data:[]});api.gamification.mockResolvedValue({data:{level_name:'新芽',title:'成员',points_balance:10,rank:2}});api.pointEvents.mockResolvedValue({data:[]});api.tasks.mockResolvedValue({data:[]});api.ranks.mockResolvedValue({data:[]});api.frames.mockResolvedValue({data:[]});api.checkIn.mockResolvedValue({data:{}})
 })
 
 describe('FanBBS core interactions',()=>{
@@ -81,5 +83,10 @@ describe('FanBBS core interactions',()=>{
     const wrapper=await render({authenticated:true});await wrapper.find('.author').trigger('click');await flushPromises();expect(api.profileById).toHaveBeenCalledWith('u-2');expect(location.hash).toBe('#user-u-2')
     await wrapper.find('.profile-actions .primary').trigger('click');await flushPromises();expect(api.follow).toHaveBeenCalledWith('u-2',false)
     await wrapper.findAll('.profile-actions button')[2].trigger('click');await flushPromises();expect(api.block).toHaveBeenCalledWith('u-2',false);wrapper.unmount()
+  })
+  it('creates a local fulfillment order without presenting payment',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.findAll('aside nav button').find(b=>b.text().includes('商城')).trigger('click');await flushPromises()
+    expect(wrapper.text()).toContain('不含付款');await wrapper.find('.product-grid .primary').trigger('click');await flushPromises();expect(api.setCart).toHaveBeenCalledWith('prod-1',1)
+    await wrapper.find('.cart-panel .primary').trigger('click');await flushPromises();expect(api.createOrder).toHaveBeenCalledTimes(1);expect(wrapper.text()).not.toContain('银行卡');wrapper.unmount()
   })
 })

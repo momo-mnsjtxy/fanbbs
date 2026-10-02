@@ -119,6 +119,21 @@ export const api = {
   ,homepage: () => request('/homepage')
   ,adminHomepage: () => request('/admin/homepage')
   ,updateHomepage: (version,input) => request('/admin/homepage', { method:'PATCH', headers:{'If-Match':`"${version}"`}, body:JSON.stringify(input) })
+  ,products: (typeId='') => request(`/products?limit=50${typeId?`&type_id=${encodeURIComponent(typeId)}`:''}`)
+  ,productTypes: () => request('/product-types')
+  ,cart: () => request('/me/cart')
+  ,setCart: (id,quantity) => request(`/me/cart/${encodeURIComponent(id)}`, {method:'PUT',body:JSON.stringify({quantity})})
+  ,removeCart: id => request(`/me/cart/${encodeURIComponent(id)}`, {method:'DELETE'})
+  ,createOrder: () => request('/orders', {method:'POST',headers:{'Idempotency-Key':crypto.randomUUID()}})
+  ,orders: () => request('/orders?limit=50')
+  ,cancelOrder: (id,reason) => request(`/orders/${encodeURIComponent(id)}/cancel`, {method:'POST',body:JSON.stringify({reason})})
+  ,checkIn: () => request('/me/check-in',{method:'POST'})
+  ,gamification: () => request('/me/gamification')
+  ,pointEvents: () => request('/me/points?limit=50')
+  ,tasks: () => request('/tasks')
+  ,ranks: () => request('/ranks?limit=20')
+  ,frames: () => request('/me/avatar-frames')
+  ,selectFrame: id => request('/me/avatar-frame',{method:'PUT',body:JSON.stringify({frame_id:id})})
 }
 
 export async function uploadFile(file, { avatar = false, altText = '' } = {}) {
