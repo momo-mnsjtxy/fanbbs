@@ -34,11 +34,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - name: Build local Go API fixture
+        working-directory: backend
+        run: go build -o "$RUNNER_TEMP/fanbbs-api" ./cmd/api
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Browser interaction checks
         run: |
-          (cd backend && FANBBS_DB="$RUNNER_TEMP/e2e.db" FANBBS_BLOB_DIR="$RUNNER_TEMP/e2e-blobs" FANBBS_ADDR=127.0.0.1:8080 go run ./cmd/api >"$RUNNER_TEMP/e2e-api.log" 2>&1) &
+          FANBBS_DB="$RUNNER_TEMP/e2e.db" FANBBS_BLOB_DIR="$RUNNER_TEMP/e2e-blobs" FANBBS_ADDR=127.0.0.1:8080 "$RUNNER_TEMP/fanbbs-api" >"$RUNNER_TEMP/e2e-api.log" 2>&1 &
           api_pid=$!
           trap 'kill "$api_pid" 2>/dev/null || true' EXIT
           for n in $(seq 1 80); do curl -fsS http://127.0.0.1:8080/healthz && break; sleep .25; done
