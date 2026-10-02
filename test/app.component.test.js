@@ -10,6 +10,7 @@ const api = vi.hoisted(() => ({
   profileById:vi.fn(),followers:vi.fn(),following:vi.fn(),block:vi.fn(),followCategory:vi.fn(),sessions:vi.fn(),revokeSession:vi.fn(),markConversationRead:vi.fn(),leaveConversation:vi.fn(),homepage:vi.fn(),adminHomepage:vi.fn(),updateHomepage:vi.fn()
   ,products:vi.fn(),productTypes:vi.fn(),cart:vi.fn(),setCart:vi.fn(),createOrder:vi.fn(),orders:vi.fn(),cancelOrder:vi.fn(),gamification:vi.fn(),pointEvents:vi.fn(),tasks:vi.fn(),ranks:vi.fn(),frames:vi.fn(),checkIn:vi.fn(),selectFrame:vi.fn()
   ,recover:vi.fn(),rotateRecoveryCodes:vi.fn()
+  ,abandonMedia:vi.fn()
 }))
 vi.mock('../src/api.js', async importOriginal => ({ ...(await importOriginal()), api }))
 import App from '../src/App.vue'
@@ -33,6 +34,7 @@ beforeEach(()=>{
   api.markConversationRead.mockResolvedValue({data:{read:true}});api.leaveConversation.mockResolvedValue({data:{left:true}});api.homepage.mockResolvedValue({data:{payload:{carousel:[],announcements:[]}}});api.adminHomepage.mockResolvedValue({data:{version:1,status:'published',payload:{carousel:[],announcements:[]}}})
   api.productTypes.mockResolvedValue({data:[]});api.products.mockResolvedValue({data:[{id:'prod-1',name:'社区贴纸',description:'本地履约',inventory:3}]});api.cart.mockResolvedValue({data:[]});api.setCart.mockResolvedValue({data:{product:{id:'prod-1',name:'社区贴纸'},quantity:1}});api.createOrder.mockResolvedValue({data:{id:'ord-1',status:'created',items:[{name:'社区贴纸',quantity:1}]}});api.orders.mockResolvedValue({data:[]});api.gamification.mockResolvedValue({data:{level_name:'新芽',title:'成员',points_balance:10,rank:2}});api.pointEvents.mockResolvedValue({data:[]});api.tasks.mockResolvedValue({data:[]});api.ranks.mockResolvedValue({data:[]});api.frames.mockResolvedValue({data:[]});api.checkIn.mockResolvedValue({data:{}})
   api.register.mockResolvedValue({data:{access_token:'a',refresh_token:'r',user:{id:'u-new',handle:'new',display_name:'新用户'},recovery_codes:['AAAAA-BBBBB-CCCCC-DDDDD']}});api.recover.mockResolvedValue({data:{changed:true,recovery_codes:['EEEEE-FFFFF-GGGGG-HHHHH']}});api.rotateRecoveryCodes.mockResolvedValue({data:{recovery_codes:['IIIII-JJJJJ-KKKKK-LLLLL']}})
+  api.abandonMedia.mockResolvedValue({})
 })
 
 describe('FanBBS core interactions',()=>{
@@ -81,6 +83,11 @@ describe('FanBBS core interactions',()=>{
     expect(api.events).toHaveBeenCalledWith('');await wrapper.find('.load-more').trigger('click');await flushPromises();expect(api.conversations).toHaveBeenLastCalledWith('conversations-next')
     await wrapper.findAll('.conversation-row')[0].trigger('click');await flushPromises();await wrapper.find('.load-more').trigger('click');await flushPromises();expect(api.messages).toHaveBeenLastCalledWith('cnv-1','messages-next');expect(wrapper.findAll('.message-bubble')).toHaveLength(2);wrapper.unmount()
   })
+  it('loads and deduplicates cursor-paged feed results',async()=>{
+    api.feed.mockResolvedValueOnce({data:[samplePost()],page:{next_cursor:'feed-next'}}).mockResolvedValueOnce({data:[samplePost(),{...samplePost(),id:'p-second',content:'第二页动态'}],page:{next_cursor:''}})
+    const wrapper=await render();expect(wrapper.text()).toContain('加载更多动态');await wrapper.find('.timeline>.load-more').trigger('click');await flushPromises()
+    expect(api.feed).toHaveBeenLastCalledWith('recommended',{},'feed-next');expect(wrapper.findAll('article.post')).toHaveLength(2);expect(wrapper.text()).toContain('第二页动态');expect(wrapper.text()).not.toContain('加载更多动态');wrapper.unmount()
+  })
   it('loads a public profile and applies follow/block controls',async()=>{
     const wrapper=await render({authenticated:true});await wrapper.find('.author').trigger('click');await flushPromises();expect(api.profileById).toHaveBeenCalledWith('u-2');expect(location.hash).toBe('#user-u-2')
     await wrapper.find('.profile-actions .primary').trigger('click');await flushPromises();expect(api.follow).toHaveBeenCalledWith('u-2',false)
@@ -94,5 +101,17 @@ describe('FanBBS core interactions',()=>{
   it('shows one-time recovery codes before closing registration',async()=>{
     const wrapper=await render();await wrapper.find('.top-actions .primary').trigger('click');await flushPromises();await wrapper.find('#new-handle').setValue('new_user');await wrapper.find('#new-email').setValue('new@example.test');await wrapper.find('#new-name').setValue('新用户');await wrapper.find('#new-password').setValue('secure-pass-1');await wrapper.find('.dialog form').trigger('submit');await flushPromises()
     expect(wrapper.text()).toContain('AAAAA-BBBBB-CCCCC-DDDDD');expect(wrapper.find('[role="dialog"]').exists()).toBe(true);await wrapper.find('.recovery-codes .primary').trigger('click');expect(wrapper.find('[role="dialog"]').exists()).toBe(false);wrapper.unmount()
+  })
+  it('abandons completed uploads when a later file upload fails and preserves the composer',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.find('.top-actions [aria-label="发布"]').trigger('click');await wrapper.find('#draft').setValue('保留这份待发布草稿')
+    const picker=wrapper.find('.media-picker input');const files=[new File(['first'],'first.png',{type:'image/png'}),new File(['second'],'second.png',{type:'image/png'})];Object.defineProperty(picker.element,'files',{value:files,configurable:true});await picker.trigger('change')
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce({status:201,ok:true,json:async()=>({data:{id:'media-first'}})}).mockResolvedValueOnce({status:500,ok:false,json:async()=>({error:{code:'upload_failed',message:'第二个文件上传失败'}})}))
+    await wrapper.find('.composer .primary').trigger('click');await flushPromises();expect(api.abandonMedia).toHaveBeenCalledWith('media-first');expect(api.createPost).not.toHaveBeenCalled();expect(wrapper.find('#draft').element.value).toBe('保留这份待发布草稿');expect(wrapper.findAll('.selected-media li')).toHaveLength(2);wrapper.unmount();vi.unstubAllGlobals()
+  })
+  it('abandons every upload when post creation fails and preserves the composer',async()=>{
+    api.createPost.mockRejectedValueOnce(new Error('帖子创建失败'));const wrapper=await render({authenticated:true});await wrapper.find('.top-actions [aria-label="发布"]').trigger('click');await wrapper.find('#draft').setValue('稍后重试的草稿')
+    const picker=wrapper.find('.media-picker input');const files=[new File(['first'],'first.png',{type:'image/png'}),new File(['second'],'second.png',{type:'image/png'})];Object.defineProperty(picker.element,'files',{value:files,configurable:true});await picker.trigger('change')
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce({status:201,ok:true,json:async()=>({data:{id:'media-one'}})}).mockResolvedValueOnce({status:201,ok:true,json:async()=>({data:{id:'media-two'}})}))
+    await wrapper.find('.composer .primary').trigger('click');await flushPromises();expect(api.abandonMedia.mock.calls.map(call=>call[0])).toEqual(['media-one','media-two']);expect(wrapper.find('#draft').element.value).toBe('稍后重试的草稿');expect(wrapper.findAll('.selected-media li')).toHaveLength(2);wrapper.unmount();vi.unstubAllGlobals()
   })
 })

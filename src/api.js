@@ -64,11 +64,11 @@ async function request(path, options = {}, retried = false) {
 }
 
 export const api = {
-  feed: async (feed = 'recommended', filters = {}) => { const value = feed === 'recommended' ? 'recommend' : feed; const params=new URLSearchParams({feed:value,limit:'20'});if(filters.categoryId)params.set('category_id',filters.categoryId);if(filters.tagId)params.set('tag_id',filters.tagId);const r = await request(`/posts?${params}`); return { ...r, data: (r.data || []).map(normalizePost) } },
+  feed: async (feed = 'recommended', filters = {}, cursor = '') => { const value = feed === 'recommended' ? 'recommend' : feed; const params=new URLSearchParams({feed:value,limit:'20'});if(filters.categoryId)params.set('category_id',filters.categoryId);if(filters.tagId)params.set('tag_id',filters.tagId);if(cursor)params.set('cursor',cursor);const r = await request(`/posts?${params}`); return { ...r, data: (r.data || []).map(normalizePost) } },
   login: (identity, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ identity, password }) }),
   createPost: async (content, mediaIds = []) => { const r = await request('/posts', { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ content, visibility: 'public', media_ids: mediaIds }) }); return { ...r, data: normalizePost(r.data) } },
   detail: async id => { const r = await request(`/posts/${encodeURIComponent(id)}`); return { ...r, data: normalizePost(r.data) } },
-  comments: async id => { const r = await request(`/posts/${encodeURIComponent(id)}/comments?limit=30`); return { ...r, data: (r.data || []).map(normalizeComment) } },
+  comments: async (id,cursor='') => { const r = await request(`/posts/${encodeURIComponent(id)}/comments?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`); return { ...r, data: (r.data || []).map(normalizeComment) } },
   comment: async (id, content) => { const r = await request(`/posts/${encodeURIComponent(id)}/comments`, { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ content }) }); return { ...r, data: normalizeComment(r.data) } },
   like: (id, liked) => request(`/posts/${encodeURIComponent(id)}/reactions/like`, { method: liked ? 'DELETE' : 'PUT' }),
   repost: id => request(`/posts/${encodeURIComponent(id)}/reposts`, { method: 'PUT' })
@@ -80,7 +80,7 @@ export const api = {
   ,categories: () => request('/categories')
   ,tags: () => request('/tags')
   ,search: async q => { const r = await request(`/search?q=${encodeURIComponent(q)}&type=all`); return { ...r, data: { ...r.data, posts: (r.data?.posts || r.data || []).map(normalizePost) } } }
-  ,bookmarks: async () => { const r = await request('/me/bookmarks?limit=30'); return { ...r, data: (r.data || []).map(normalizePost) } }
+  ,bookmarks: async (cursor='') => { const r = await request(`/me/bookmarks?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`); return { ...r, data: (r.data || []).map(normalizePost) } }
   ,bookmark: (id, marked) => request(`/posts/${encodeURIComponent(id)}/bookmark`, { method: marked ? 'DELETE' : 'PUT' })
   ,follow: (id, following) => request(`/users/${encodeURIComponent(id)}/follow`, { method: following ? 'DELETE' : 'PUT' })
   ,profileById: id => request(`/users/${encodeURIComponent(id)}`)
@@ -91,7 +91,7 @@ export const api = {
   ,categoryFollows: () => request('/me/category-follows?limit=50')
   ,sessions: () => request('/me/sessions')
   ,revokeSession: id => request(`/me/sessions/${encodeURIComponent(id)}`, { method:'DELETE' })
-  ,notifications: () => request('/notifications?limit=30')
+  ,notifications: (cursor='') => request(`/notifications?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
   ,readNotifications: ids => request('/notifications/read', { method: 'PUT', body: JSON.stringify({ ids }) })
   ,report: (targetType, targetId, reason) => request('/reports', { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ target_type: targetType, target_id: targetId, reason }) })
   ,updatePost: async (id, version, content) => { const r = await request(`/posts/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'If-Match': `"${version}"` }, body: JSON.stringify({ content }) }); return { ...r, data: normalizePost(r.data) } }
@@ -140,6 +140,7 @@ export const api = {
   ,ranks: () => request('/ranks?limit=20')
   ,frames: () => request('/me/avatar-frames')
   ,selectFrame: id => request('/me/avatar-frame',{method:'PUT',body:JSON.stringify({frame_id:id})})
+  ,abandonMedia: id => request(`/uploads/${encodeURIComponent(id)}`, { method:'DELETE' })
 }
 
 export async function uploadFile(file, { avatar = false, altText = '' } = {}) {
