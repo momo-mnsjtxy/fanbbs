@@ -20,6 +20,18 @@ test('approved responsive shell and login gate are usable', async ({ page }, tes
   await page.screenshot({ path: testInfo.outputPath(`fanbbs-${testInfo.project.name}.png`), fullPage: true })
 })
 
+test('keyboard focus and responsive landmarks remain accessible', async ({ page }, testInfo) => {
+  await page.goto('/')
+  await page.keyboard.press('Tab')
+  await expect(page.locator('.skip')).toBeFocused()
+  await expect(page.locator('main#feed')).toHaveCount(1)
+  await expect(page.getByRole('navigation')).toHaveCount(1)
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(1)
+  const unlabeledButtons = await page.locator('button').evaluateAll(buttons => buttons.filter(button => !((button.getAttribute('aria-label') || button.textContent || '').trim())).length)
+  expect(unlabeledButtons).toBe(0)
+})
+
 test('synthetic registration displays one-time recovery codes', async ({ page }, testInfo) => {
   await page.goto('/')
   await page.getByRole('button', { name: '注册' }).first().click()
