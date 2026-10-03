@@ -32,6 +32,31 @@ test('keyboard focus and responsive landmarks remain accessible', async ({ page 
   expect(unlabeledButtons).toBe(0)
 })
 
+test('a failed destination can retry and remains browser-history safe', async ({ page }) => {
+  let interrupted = false
+  await page.route('**/api/v1/categories', async route => {
+    if (!interrupted) {
+      interrupted = true
+      await route.abort('failed')
+      return
+    }
+    await route.continue()
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: '发现' }).click()
+  await expect(page.getByRole('alert')).toContainText('无法连接社区服务')
+  await page.getByRole('button', { name: '重试' }).click()
+  await expect(page.locator('.category-card-main').first()).toBeVisible()
+
+  await page.goBack()
+  await expect(page).toHaveURL(/#home$/)
+  await expect(page.locator('article.post').first()).toBeVisible()
+  await page.goForward()
+  await expect(page).toHaveURL(/#discover$/)
+  await expect(page.locator('.category-card-main').first()).toBeVisible()
+})
+
 test('synthetic registration displays one-time recovery codes', async ({ page }, testInfo) => {
   await page.goto('/')
   await page.getByRole('button', { name: '注册' }).first().click()
@@ -63,7 +88,9 @@ test('registered member publishes media and replies through the real API', async
   const replyBody = `真实链路回复 ${handle}`
 
   await page.goto('/')
-  await page.getByRole('button', { name: '注册' }).first().click()
+  await page.getByRole('button', { name: '发布新帖' }).click()
+  await expect(page.getByRole('dialog', { name: '欢迎回来' })).toBeVisible()
+  await page.getByRole('button', { name: '还没有账号？注册' }).click()
   await page.getByLabel('用户名').fill(handle)
   await page.getByLabel('邮箱').fill(`${handle}@example.test`)
   await page.getByLabel('显示名称').fill(`Flow ${handle}`)
@@ -71,16 +98,24 @@ test('registered member publishes media and replies through the real API', async
   await page.getByRole('button', { name: '注册' }).last().click()
   await page.getByRole('button', { name: '我已安全保存' }).click()
 
-  await page.getByRole('button', { name: '发布新帖' }).click()
+  await expect(page.getByRole('dialog', { name: '发布新帖' })).toBeVisible()
   await page.getByLabel('正文').fill(postBody)
   await page.locator('input[type="file"]').setInputFiles({
     name: 'e2e-pixel.png',
     mimeType: 'image/png',
-    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAUAAAAC0CAIAAABqhmJGAAADnUlEQVR42u3TZ3KVBRgG0HcpgUBwJTaUJJCQRuAmNze9QVwKiBSRIlJEighuQKwoVhQrihXFiv722wXzzJyZs4VT/736FBCq/r26BoSq+1fXgFB1/8oaEKr+ubIGhGoC7wFC1d+v7AFCCQzJgf+6vAcIJTAkB/7z8m4gVP3x8m4glMCQHPj3S7uBUE3gVSBU3bu0CoSqexdXgVD128VVIJTAkBz41wsrQKi6e2EFCFV3z68AoeqX8ytAqCbwMhCqfn5pGQglMCQH/uncMhBKYEgO/OO5JSBU/fDiEhBKYEgO/P3ZJSBUE3gRCFV3zi4CoerOmUUgVH13ZhEIJTAkB/729AIQqm6fXgBC1e1TC0Co+ubUAhCqCTwPhKqvX5gHQgkMyYG/OjkPhBIYkgN/eXIOCFVfPD8HhBIYkgN/fmIOCNUEngVC1a0Ts0CounV8FghVnx2fBUIJDMmBPz02A4Sqm8dmgFB18+gMEKo+OToDhGoCTwOh6uPnpoFQAkNy4I+OTAOhBIbkwB8e6QCh6oNnO0AogSE58PuHO0CoJvAUEKpuHJ4CQtWNQ1NAqHrv0BQQSmBIDvzuwTYQqq4fbAOh6vqBNhCq3jnQBkI1gSeBUPX2M5NAKIEhOfBb+yeBUAJDcuA3908AoeqNpyeAUAJDcuDX900AoZrALSBUXdvXAkLVtb0tIFS9trcFhKqHVmeAULVpZRoIJTBEB16eBkI1gTtAqNq01AFCCQzRgRc7QKgm8BQQqjYtTAGhBIbowPNtIFT1zLeBUNUz1wZCCQzZgSeBUPUzOwmEEhiiA89MAqGawBNAqOqZngBCCQzRgTstIFRt7LSAULVxqgWEEhiiA7d3AaEEhujAk7uAUE3gnUAogSE68MROIJTAEB24NQ6Eqg2tcSBUbdg1DoQSGKID79wBhBIYogOP7wBCNYHHgFC1YccYEEpgiA48NgaEagKPAqEEhuTA3aOjQKgm8AgQqrpHRoBQAkN04OERIFQTeBgIVd1Dw0AogSE68PZhIFQTeAgIVd2DQ0CoWj84BISq9QPbgVACg8DAgwm8bTsQqgk8CISq9VsHgVACQ3Tg/gEglMAQHbhvAAhV6/oGgFC1rncbEEpgiA68ZRsQSmCIDvzkViCUwCAw8GACP9EPhBIYogNv7gdCVdfmfiBUdT3eB4QSGKIDP9YHhGoC9wKhquvRXiCUwBAd+JFeIFQTeAsQqroe3gKEEhiC/Q+Sf0v6czi0LQAAAABJRU5ErkJggg==', 'base64')
   })
-  await page.getByRole('dialog').getByRole('button', { name: '发布', exact: true }).click()
+  let createRequests = 0
+  page.on('request', request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/v1/posts') createRequests += 1
+  })
+  await page.locator('.composer-form').evaluate(form => {
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+  })
   const published = page.locator('article.post').filter({ hasText: postBody }).first()
   await expect(published).toBeVisible()
+  expect(createRequests).toBe(1)
   await expect(published.getByRole('img', { name: 'e2e-pixel.png' })).toBeVisible()
 
   await published.locator('.post-content').click()
@@ -91,4 +126,14 @@ test('registered member publishes media and replies through the real API', async
   await commentBox.press('Tab')
   await page.keyboard.press('Enter')
   await expect(page.getByText(replyBody)).toBeVisible()
+  await expect(page.locator('.toast')).not.toContainText('Cannot read properties')
+
+  await page.goBack()
+  await expect(page).toHaveURL(/#home$/)
+  await expect(page.locator('.detail-title')).toHaveCount(0)
+  await expect(published).toBeVisible()
+  await page.goForward()
+  await expect(page).toHaveURL(/#post-/)
+  await expect(page.locator('.detail-copy')).toContainText(postBody)
+  await page.screenshot({ path: testInfo.outputPath(`fanbbs-workflow-${testInfo.project.name}.png`), fullPage: true })
 })
