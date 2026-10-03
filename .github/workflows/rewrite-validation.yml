@@ -23,7 +23,7 @@ jobs:
           repository: momo-mnsjtxy/fanbbsapi
           # Pin the verified backend pair so frontend CI cannot race a later
           # backend branch update while browser checks are running.
-          ref: 5915071376ddac130938dac5c4d22227e56063b1
+          ref: 85df66d9976e16ede678645e7f46f60059fdbf23
           path: backend
       - uses: actions/setup-go@v5
         with:
