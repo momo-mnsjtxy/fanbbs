@@ -59,7 +59,7 @@ test('a failed destination can retry and remains browser-history safe', async ({
 
 test('synthetic registration displays one-time recovery codes', async ({ page }, testInfo) => {
   await page.goto('/')
-  await page.getByRole('button', { name: '注册' }).first().click()
+  await page.getByRole('button', { name: '加入对话', exact: true }).click()
   const suffix = testInfo.project.name.replace(/[^a-z0-9]/g, '')
   await page.getByLabel('用户名').fill(`e2e_${suffix}`)
   await page.getByLabel('邮箱').fill(`e2e_${suffix}@example.test`)

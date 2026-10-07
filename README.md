@@ -15,7 +15,7 @@ During local development, Vite proxies `/api` to `http://127.0.0.1:8080`, so sta
 
 ## Implemented workflows
 
-- Material 3 forest-teal community timeline with 推荐 / 最新 / 全局 feeds, category and tag routes, search and public profiles
+- Material 3 lavender community timeline with 推荐 / 最新 / 全局 feeds, category and tag routes, search and public profiles
 - Registration, login, recovery codes, account/profile controls and device sessions
 - Rich publishing, local media, detail, nested replies, reactions, reposts, bookmarks and curated collections
 - Notifications, private conversations, moderation/admin tools and homepage configuration
@@ -28,3 +28,26 @@ During local development, Vite proxies `/api` to `http://127.0.0.1:8080`, so sta
 `npm test` covers the request adapter and component interactions. `npm run test:e2e` runs desktop and mobile Chromium against the real local Go API. The browser suite exercises auth-gated action resumption, media publishing, replies, duplicate-submit suppression, interrupted-request retry, browser Back/Forward hydration, responsive landmarks and keyboard focus.
 
 Cash payments, withdrawals, external fulfillment and other regulated financial capabilities remain disabled. The local order workflow never charges a payment method.
+
+## Community design refresh
+
+The local `feat/solian-inspired-ui` work is based on the pure Vue rewrite at
+`c708fc1432d91dd84afc224b9f0669341cea430e`, rather than the legacy UniApp default
+branch. `src/community.css` layers the new design over existing feature styles;
+`src/UiIcon.vue` supplies dependency-free outline icons.
+
+The visual direction references the rendered public Solian timeline: calm white
+surfaces, subtle lavender selection states, quiet dividers and a spacious
+three-column desktop layout. FanBBS keeps its own identity and API. The mobile
+layout preserves its existing four primary destinations and a separate publish
+button; the menu exposes secondary destinations.
+
+Included refinements: keyboard-operated feed tabs, a working mobile menu,
+Escape dismissal and focus restoration for dialogs, visible reconnect/loading
+states, derived category/topic sidebars, and protection against late post-detail
+responses overwriting a newer destination. Sidebar topics come from loaded
+posts, not invented popularity counts.
+
+Validation notes for this refresh are in `DESIGN-REVIEW.md`. Browser launch was
+blocked by the execution environment, so desktop/mobile screenshots and browser
+E2E are pending; the component/HTTP tests are not represented as browser tests.

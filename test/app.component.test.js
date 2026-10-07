@@ -107,7 +107,7 @@ describe('FanBBS core interactions',()=>{
   })
   it('loads and deduplicates cursor-paged feed results',async()=>{
     api.feed.mockResolvedValueOnce({data:[samplePost()],page:{next_cursor:'feed-next'}}).mockResolvedValueOnce({data:[samplePost(),{...samplePost(),id:'p-second',content:'第二页动态'}],page:{next_cursor:''}})
-    const wrapper=await render();expect(wrapper.text()).toContain('加载更多动态');await wrapper.find('.timeline>.load-more').trigger('click');await flushPromises()
+    const wrapper=await render();expect(wrapper.text()).toContain('加载更多动态');await wrapper.find('.timeline .load-more').trigger('click');await flushPromises()
     expect(api.feed).toHaveBeenLastCalledWith('recommended',{},'feed-next');expect(wrapper.findAll('article.post')).toHaveLength(2);expect(wrapper.text()).toContain('第二页动态');expect(wrapper.text()).not.toContain('加载更多动态');wrapper.unmount()
   })
   it('loads a public profile and applies follow/block controls',async()=>{
@@ -247,5 +247,65 @@ describe('FanBBS core interactions',()=>{
   })
   it('ignores a repeated publish submit while the real mutation is pending',async()=>{
     let resolveCreate;api.createPost.mockReturnValueOnce(new Promise(resolve=>{resolveCreate=resolve}));const wrapper=await render({authenticated:true});await wrapper.find('.rail-compose').trigger('click');await flushPromises();await wrapper.find('#draft').setValue('只发布一次');const form=wrapper.find('.composer-form');await form.trigger('submit');await form.trigger('submit');expect(api.createPost).toHaveBeenCalledTimes(1);resolveCreate({data:samplePost()});await flushPromises();wrapper.unmount()
+  })
+  it('dismisses the mobile drawer by scrim, Escape and destination selection',async()=>{
+    const wrapper=await render();const menu=wrapper.find('.menu')
+    await menu.trigger('click');expect(menu.attributes('aria-expanded')).toBe('true')
+    await wrapper.find('.menu-scrim').trigger('click');expect(menu.attributes('aria-expanded')).toBe('false')
+    await menu.trigger('click');window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await flushPromises();expect(wrapper.find('.menu-scrim').exists()).toBe(false)
+    await menu.trigger('click');await wrapper.findAll('aside nav button').find(b=>b.text().includes('发现')).trigger('click');await flushPromises();expect(location.hash).toBe('#discover');expect(menu.attributes('aria-expanded')).toBe('false');wrapper.unmount()
+  })
+  it('supports roving keyboard feed tabs with a labelled tabpanel',async()=>{
+    const wrapper=await render()
+    for(const [source,key,target] of [['recommended','ArrowRight','latest'],['latest','End','global'],['global','ArrowRight','recommended'],['recommended','ArrowLeft','global'],['global','Home','recommended']]){
+      await wrapper.find(`#feed-tab-${source}`).trigger('keydown',{key});await flushPromises()
+      expect(api.feed).toHaveBeenLastCalledWith(target,{})
+      expect(wrapper.findAll('[role="tab"][tabindex="0"]')).toHaveLength(1)
+      expect(document.activeElement.id).toBe(`feed-tab-${target}`)
+      expect(wrapper.find('[role="tabpanel"]').attributes('aria-labelledby')).toBe(`feed-tab-${target}`)
+    }
+    wrapper.unmount()
+  })
+  it('closes the auth dialog with Escape and restores trigger focus',async()=>{
+    const wrapper=await render();const trigger=wrapper.find('.rail-compose');trigger.element.focus();await trigger.trigger('click');await flushPromises()
+    expect(wrapper.find('[role="dialog"]').element.contains(document.activeElement)).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await flushPromises()
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);expect(document.activeElement).toBe(trigger.element);expect(document.body.classList.contains('dialog-open')).toBe(false);expect(location.hash).toBe('#home');wrapper.unmount()
+  })
+  it('preserves composer content when close is canceled and after confirmed dismissal',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.find('.rail-compose').trigger('click');await flushPromises();await wrapper.find('#draft').setValue('保留这份草稿')
+    confirm.mockReturnValueOnce(false);window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await flushPromises();expect(wrapper.find('#draft').element.value).toBe('保留这份草稿');expect(api.createPost).not.toHaveBeenCalled()
+    await wrapper.find('.composer .dialog-close').trigger('click');await flushPromises();expect(wrapper.find('.composer').exists()).toBe(false)
+    await wrapper.find('.rail-compose').trigger('click');await flushPromises();expect(wrapper.find('#draft').element.value).toBe('保留这份草稿');expect(localStorage.getItem('fanbbs_draft')).toBe('保留这份草稿');wrapper.unmount()
+  })
+  it('returns following navigation to recommended home with consistent active state',async()=>{
+    const wrapper=await render({authenticated:true});const nav=()=>wrapper.findAll('aside nav button')
+    await nav().find(b=>b.text().includes('关注')).trigger('click');await flushPromises();expect(api.feed).toHaveBeenLastCalledWith('following',{});expect(nav().find(b=>b.text().includes('关注')).classes()).toContain('active');expect(nav().find(b=>b.text().includes('首页')).classes()).not.toContain('active')
+    await nav().find(b=>b.text().includes('首页')).trigger('click');await flushPromises();expect(api.feed).toHaveBeenLastCalledWith('recommended',{});expect(wrapper.find('#feed-tab-recommended').attributes('aria-selected')).toBe('true');expect(nav().find(b=>b.text().includes('首页')).attributes('aria-current')).toBe('page');wrapper.unmount()
+  })
+  it('ignores stale feed results after rapid tab changes and suppresses pending repeat clicks',async()=>{
+    const wrapper=await render();let resolveLatest;api.feed.mockReturnValueOnce(new Promise(resolve=>{resolveLatest=resolve}));api.feed.mockResolvedValueOnce({data:[{...samplePost(),content:'全局新结果'}]})
+    await wrapper.find('#feed-tab-latest').trigger('click');const calls=api.feed.mock.calls.length;await wrapper.find('#feed-tab-latest').trigger('click');expect(api.feed.mock.calls.length).toBe(calls)
+    await wrapper.find('#feed-tab-global').trigger('click');await flushPromises();resolveLatest({data:[{...samplePost(),content:'过期最新结果'}]});await flushPromises()
+    expect(wrapper.find('article.post').text()).toContain('全局新结果');expect(wrapper.text()).not.toContain('过期最新结果');expect(wrapper.find('#feed-tab-global').attributes('aria-selected')).toBe('true');wrapper.unmount()
+  })
+  it('rejects late detail responses after home navigation without leaving feed loading',async()=>{
+    const wrapper=await render();let resolveDetail;api.detail.mockReturnValueOnce(new Promise(resolve=>{resolveDetail=resolve}))
+    await wrapper.find('.post-content').trigger('click');expect(wrapper.find('.route-loading').exists()).toBe(true)
+    await wrapper.find('.brand').trigger('click');await flushPromises();expect(location.hash).toBe('#home');expect(wrapper.find('.route-loading').exists()).toBe(false);expect(wrapper.find('article.post').exists()).toBe(true)
+    resolveDetail({data:{...samplePost(),content:'迟到详情'}});await flushPromises();expect(wrapper.find('.detail-title').exists()).toBe(false);expect(wrapper.text()).not.toContain('迟到详情');expect(api.comments).not.toHaveBeenCalled();expect(wrapper.find('article.post').exists()).toBe(true);wrapper.unmount()
+  })
+  it('does not corrupt home after a reply completes following navigation away',async()=>{
+    const wrapper=await render({authenticated:true});await wrapper.find('.post-content').trigger('click');await flushPromises();let resolveComment;api.comment.mockReturnValueOnce(new Promise(resolve=>{resolveComment=resolve}));await wrapper.find('#comment').setValue('离开时提交的回复');await wrapper.find('.comments form').trigger('submit')
+    await wrapper.find('.brand').trigger('click');await flushPromises();resolveComment({data:{id:'late-comment',content:'离开时提交的回复',author:{id:'u-1',name:'测试者'}}});await flushPromises()
+    expect(location.hash).toBe('#home');expect(wrapper.find('.detail-title').exists()).toBe(false);expect(wrapper.find('.toast').text()).not.toContain('Cannot read properties');expect(wrapper.find('article.post').exists()).toBe(true);wrapper.unmount()
+  })
+  it('does not append an interrupted nested reply into a newer post thread',async()=>{
+    const root={id:'c-root',depth:0,author:{id:'u-2',name:'林野',handle:'linye'},content:'原来的回复',age:'刚刚'}
+    api.comments.mockResolvedValueOnce({data:[root]});const wrapper=await render({authenticated:true});await wrapper.find('.post-content').trigger('click');await flushPromises()
+    await wrapper.findAll('.comment-actions button').find(b=>b.text()==='回复').trigger('click');await wrapper.find('.inline-reply textarea').setValue('迟到的嵌套回复');let resolveReply;api.reply.mockReturnValueOnce(new Promise(resolve=>{resolveReply=resolve}));await wrapper.find('.inline-reply').trigger('submit')
+    await wrapper.find('.brand').trigger('click');await flushPromises();api.detail.mockResolvedValueOnce({data:{...samplePost(),id:'p-new',content:'新的详情',comments:9}});await wrapper.find('.post-content').trigger('click');await flushPromises()
+    resolveReply({data:{id:'c-late',parent_id:'c-root',depth:1,author:root.author,content:'迟到的嵌套回复'}});await flushPromises()
+    expect(wrapper.find('.detail-copy').text()).toBe('新的详情');expect(wrapper.find('.reply-count').text()).toBe('9');expect(wrapper.find('.comments').text()).not.toContain('迟到的嵌套回复');wrapper.unmount()
   })
 })
