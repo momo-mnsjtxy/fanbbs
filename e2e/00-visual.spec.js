@@ -24,7 +24,8 @@ test('capture real responsive community screens', async ({ page }, testInfo) => 
     await page.getByRole('button', { name: '打开菜单' }).click()
     await expect(page.locator('.rail.is-open')).toBeVisible()
     await page.screenshot({ path: path.join(output, 'fanbbs-mobile-menu.png'), animations: 'disabled' })
-    await page.getByRole('button', { name: '关闭菜单' }).click()
+    // Click the visible outside strip rather than the drawer-covered scrim center.
+    await page.getByRole('button', { name: '关闭菜单' }).click({ position: { x: 380, y: 100 } })
     await expect(page.locator('.rail.is-open')).toHaveCount(0)
   }
 
@@ -35,3 +36,4 @@ test('capture real responsive community screens', async ({ page }, testInfo) => 
   await page.screenshot({ path: path.join(output, `fanbbs-detail-${testInfo.project.name}.png`), fullPage: true, animations: 'disabled' })
   expect(errors).toEqual([])
 })
+
