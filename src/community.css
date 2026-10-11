@@ -49,3 +49,83 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 .route-loading{padding:10px 16px;margin-bottom:10px;border:1px solid #e3d9ee;border-radius:10px;background:#f2ecf9;color:#786582;font-size:12px}
 .post-content{font-size:14px}.post-title{font-size:16px}.post-summary{font-size:13px}.post-body header .author{font-size:14px}.post-body header span{font-size:11px}
 @media(max-width:800px){.post-content{font-size:14px;line-height:1.9}.post-title{font-size:15px}.post-summary{font-size:12px}.post-body header .author{font-size:13px}.post-body header span{font-size:10px}.comment p{font-size:13px}}
+
+/* Kima-informed control rhythm, expressed in FanBBS's own lavender tokens.
+   Keep typography and layout familiar; strengthen controls and icon legibility. */
+:root {
+  --control-height:44px;
+  --control-radius:999px;
+  --control-hover:#eeebf8;
+  --control-pressed:#e3dcf1;
+  --control-motion:150ms;
+}
+.ui-icon{display:inline-block;overflow:visible;pointer-events:none}
+/* CSS resizes icons across contexts. Vector effect keeps the actual screen
+   stroke consistent without a JS size observer or mismatched size props. */
+.ui-icon :is(path,circle,ellipse,line,polyline,polygon,rect){vector-effect:non-scaling-stroke}
+.icon-button{width:var(--control-height);height:var(--control-height);border-radius:var(--control-radius)}
+.primary,.outline,.rail-compose{min-height:var(--control-height);border-radius:var(--control-radius)}
+.primary.small,.join .primary{min-height:40px;border-radius:var(--control-radius)}
+.rail nav button{min-height:48px;border-radius:var(--control-radius)}
+.rail nav button .ui-icon{width:22px;height:22px}
+.tabs button{border-radius:var(--control-radius)}
+.post footer button,.comment-actions button{min-height:var(--control-height);min-width:var(--control-height);border-radius:var(--control-radius)}
+.post footer .ui-icon,.comment-actions .ui-icon{width:18px;height:18px}
+.comment-actions button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.repost-label{display:flex;align-items:center;gap:6px}.repost-label .ui-icon{width:14px;height:14px}
+:is(.icon-button,.rail nav button,.tabs button,.post footer button,.comment-actions button):active:not(:disabled){background:var(--control-pressed)}
+:is(.primary,.outline,.rail-compose,.mobile-fab){transition:background-color var(--control-motion),transform var(--control-motion)}
+:is(.primary,.outline,.rail-compose,.mobile-fab):active:not(:disabled){transform:scale(.97)}
+@media(max-width:800px){
+  .menu,.top-actions .icon-button{width:44px;height:44px}
+  .topbar{gap:8px}.brand-group{gap:2px}
+  .rail.is-open{border-radius:0 28px 28px 0}
+  .post footer{gap:10px}
+}
+@media(max-width:380px){.topbar{padding-inline:8px;gap:4px}.brand{gap:5px;font-size:18px}.brand-mark{width:27px}.post footer{gap:6px}}
+@media(prefers-reduced-motion:reduce){
+  :is(.primary,.outline,.rail-compose,.mobile-fab){transition:none}
+  :is(.primary,.outline,.rail-compose,.mobile-fab):active:not(:disabled){transform:none}
+}
+.icon-button.menu{display:none}
+.tiny-spark .ui-icon{width:27px;height:27px}
+.art-spark .ui-icon{width:75px;height:75px}
+.community-art .ui-icon{width:64px;height:64px}
+.community-art span:nth-child(2) .ui-icon{width:44px;height:44px}
+@media(max-width:800px){.icon-button.menu{display:grid}}
+
+/* Private author workspace and inbox controls reuse the community palette. */
+.inbox-page .section-heading { flex-wrap: wrap; gap: 12px; }
+.inbox-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 0 0 20px; }
+.inbox-controls > label:first-child, .submission-filter { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.inbox-controls select, .submission-filter select { min-height: 44px; max-width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; }
+.preference-option { display: flex; align-items: center; gap: 9px; min-height: 44px; cursor: pointer; }
+.preference-option input { width: 18px; height: 18px; accent-color: var(--primary); }
+.notification-preferences { padding: 20px; margin: 0 0 20px; background: var(--surface-soft, #f8f6fb); border: 1px solid var(--line); border-radius: 16px; }
+.notification-preferences h2 { margin-top: 0; font-size: 18px; }
+.notification-preferences fieldset { border: 0; padding: 0; margin: 12px 0; display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.muted-copy { color: #6f617b; font-size: 14px; line-height: 1.7; }
+.unread-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; min-height: 22px; padding: 0 6px; margin-left: 8px; border-radius: 999px; background: var(--primary); color: white; font-size: 12px; font-weight: 700; }
+.submission-filter { margin: 20px 0; }
+.submission-row { display: block; width: 100%; padding: 20px 0; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.submission-row strong { display: block; font-size: 17px; margin-top: 10px; }
+.submission-row p { color: #6f617b; line-height: 1.65; margin-bottom: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.submission-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.submission-meta time, .submission-detail time { color: #6f617b; font-size: 13px; }
+.status-label { display: inline-block; border-radius: 999px; padding: 4px 10px; background: #f1edf8; color: #624780; font-size: 13px; }
+.status-label[data-status='rejected'] { background: #fff0ed; color: #984a3c; }
+.submission-detail { margin-top: 24px; overflow-wrap: anywhere; }
+.submission-detail h2 { font-size: 24px; line-height: 1.4; }
+.review-snapshot { padding: 16px; margin: 20px 0; background: #f8f6fb; border-radius: 14px; }
+.review-snapshot h3 { margin: 0 0 8px; font-size: 16px; }
+.review-snapshot p { line-height: 1.7; white-space: pre-wrap; }
+.submission-body { white-space: pre-wrap; line-height: 1.8; margin: 24px 0; }
+.submission-media { display: grid; grid-template-columns: repeat(auto-fit,minmax(140px,1fr)); gap: 10px; margin: 20px 0; }
+.submission-media img, .submission-media video { width: 100%; height: auto; border-radius: 12px; }
+.submission-attachment { margin: 0; min-width: 0; }
+.submission-attachment figcaption { margin-top: 6px; color: #6f617b; font-size: 13px; }
+@media (max-width: 600px) {
+  .inbox-controls { gap: 8px 14px; }
+  .notification-preferences { padding: 16px; }
+  .inbox-page .message-tabs { order: 2; flex-basis: 100%; }
+}

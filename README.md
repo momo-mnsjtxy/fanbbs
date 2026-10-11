@@ -34,7 +34,7 @@ Cash payments, withdrawals, external fulfillment and other regulated financial c
 The local `feat/solian-inspired-ui` work is based on the pure Vue rewrite at
 `c708fc1432d91dd84afc224b9f0669341cea430e`, rather than the legacy UniApp default
 branch. `src/community.css` layers the new design over existing feature styles;
-`src/UiIcon.vue` supplies dependency-free outline icons.
+`src/UiIcon.vue` now renders the official Hugeicons free rounded-stroke icons.
 
 The visual direction references the rendered public Solian timeline: calm white
 surfaces, subtle lavender selection states, quiet dividers and a spacious
@@ -48,6 +48,20 @@ states, derived category/topic sidebars, and protection against late post-detail
 responses overwriting a newer destination. Sidebar topics come from loaded
 posts, not invented popularity counts.
 
-Validation notes for this refresh are in `DESIGN-REVIEW.md`. Browser launch was
-blocked by the execution environment, so desktop/mobile screenshots and browser
-E2E are pending; the component/HTTP tests are not represented as browser tests.
+Historical design notes are in `DESIGN-REVIEW.md`. The current icon refresh uses
+the official Hugeicons packages; their licenses are included under `licenses/`.
+
+## Inbox and author workspace
+
+The October 11 continuation adds notification preferences and per-kind unread
+filters, separate notification/chat counts, conversation unread badges, and a
+private “我的稿件” workspace. Choose “提交审核” in the composer to submit a pending
+post; review outcomes are available only through the author's private snapshot.
+
+The reviewed October 11 checkpoint passed 109 adapter/component tests, a
+production build, and three live scenarios against the paired Go API, including
+private PNG/MP4 access and session/inbox regressions. Browser tests were blocked
+at Chromium launch; browser layout, playback and fresh screenshots remain
+unverified. Historical screenshots do not verify this continuation. Run the
+isolated live checks with
+`GO=/path/to/go ./scripts/test-local-api.sh --api-contract`.

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const samplePost = () => ({ id:'p-test', author:{id:'u-2',name:'林野',handle:'linye'}, age:'刚刚', content:'组件交互测试动态', comments:1,reposts:2,likes:3,views:4,liked:false,bookmarked:false })
 const api = vi.hoisted(() => ({
-  feed:vi.fn(), profile:vi.fn(), categories:vi.fn(), search:vi.fn(), bookmarks:vi.fn(), notifications:vi.fn(), adminReview:vi.fn(),
+  feed:vi.fn(), profile:vi.fn(), categories:vi.fn(), search:vi.fn(), bookmarks:vi.fn(), notifications:vi.fn(), notificationCounts:vi.fn(), conversationCounts:vi.fn(), notificationPreferences:vi.fn(), updateNotificationPreferences:vi.fn(), ownPosts:vi.fn(), ownPost:vi.fn(), adminReview:vi.fn(),
   like:vi.fn(), repost:vi.fn(), bookmark:vi.fn(), follow:vi.fn(), detail:vi.fn(), comments:vi.fn(), updateProfile:vi.fn(),
   login:vi.fn(), register:vi.fn(), logout:vi.fn(), createPost:vi.fn(), comment:vi.fn(), reply:vi.fn(), readNotifications:vi.fn(), moderate:vi.fn(), report:vi.fn(),
   conversations:vi.fn(), conversation:vi.fn(), createConversation:vi.fn(), messages:vi.fn(), sendMessage:vi.fn(), events:vi.fn(), tags:vi.fn(), adminUsers:vi.fn(), adminContent:vi.fn(), setUserStatus:vi.fn(), createCategory:vi.fn(), updateCategory:vi.fn(), deleteCategory:vi.fn(), createTag:vi.fn(), updateTag:vi.fn(), deleteTag:vi.fn(),
@@ -25,7 +25,7 @@ async function render({ authenticated=false }={}) {
 }
 
 beforeEach(()=>{
-  vi.clearAllMocks();sessionStorage.clear();localStorage.clear();history.replaceState({},'','#home')
+  vi.resetAllMocks();sessionStorage.clear();localStorage.clear();history.replaceState({},'','#home')
   vi.stubGlobal('confirm',vi.fn(()=>true));vi.stubGlobal('prompt',vi.fn(()=> '足够长的审核测试理由'))
   api.feed.mockResolvedValue({data:[samplePost()]});api.profile.mockResolvedValue({data:{id:'u-1',handle:'tester',display_name:'测试者',role:'member'}})
   api.categories.mockResolvedValue({data:[{id:'cat-1',slug:'tech',name:'技术',description:'分享代码、产品与数字生活',image_url:'/media/tech-icon.webp',background_url:'/media/tech-cover.webp',post_count:12}]});api.search.mockResolvedValue({data:{posts:[samplePost()],users:[{id:'u-2',handle:'linye',display_name:'林野',following:false}],tags:[{id:'tag-1',name:'城市'}]}})
@@ -33,6 +33,7 @@ beforeEach(()=>{
   api.bookmark.mockResolvedValue({data:{changed:true}});api.follow.mockResolvedValue({data:{changed:true}});api.logout.mockResolvedValue({data:{}})
   api.conversations.mockResolvedValue({data:[{id:'cnv-1',title:'林野',updated_at:'刚刚',last_message:{content:'你好'}}]});api.conversation.mockResolvedValue({data:{id:'cnv-1',members:[]}});api.messages.mockResolvedValue({data:[{id:'msg-1',sender_id:'u-2',content:'你好',created_at:'刚刚'}]});api.sendMessage.mockResolvedValue({data:{id:'msg-2',sender_id:'u-1',content:'收到',created_at:'刚刚'}})
   api.events.mockResolvedValue({data:[],page:{next_cursor:''}})
+  api.notificationCounts.mockResolvedValue({data:{total:0,by_type:{comment:0,like:0,repost:0,follow:0,moderation:0,message:0}}});api.conversationCounts.mockResolvedValue({data:{conversations:0,messages:0}});api.notificationPreferences.mockResolvedValue({data:{preferences:{comment:true,like:true,repost:true,follow:true,message:true,moderation:true}}});api.ownPosts.mockResolvedValue({data:[]});api.ownPost.mockResolvedValue({data:{post:{...samplePost(),status:'pending'},moderation:{state:'pending'}}})
   api.tags.mockResolvedValue({data:[{id:'tag-1',name:'城市',slug:'city'}]});api.adminUsers.mockResolvedValue({data:[{id:'u-2',display_name:'林野',handle:'linye',role:'member',status:'active'}]});api.adminContent.mockResolvedValue({data:[]});api.setUserStatus.mockResolvedValue({data:{status:'suspended'}})
   api.sessions.mockResolvedValue({data:[{id:'sess-1',current:true,created_at:'今天'}]});api.blocks.mockResolvedValue({data:[]});api.categoryFollows.mockResolvedValue({data:[]});api.profileById.mockResolvedValue({data:{id:'u-2',name:'林野',handle:'linye',bio:'简介',follower_count:1,following_count:2,post_count:3,following:false,blocked_by_me:false}});api.profilePosts.mockResolvedValue({data:[samplePost()]});api.profileComments.mockResolvedValue({data:[]});api.followers.mockResolvedValue({data:[]});api.following.mockResolvedValue({data:[]});api.block.mockResolvedValue({data:{changed:true}});api.followCategory.mockResolvedValue({data:{changed:true}});api.revokeSession.mockResolvedValue({data:{revoked:true}})
   api.collections.mockResolvedValue({data:[]});api.publicCollections.mockResolvedValue({data:[]});api.collection.mockResolvedValue({data:{collection:{id:'col-1',name:'公开精选',description:'公开内容'},posts:[]}});api.createCollection.mockResolvedValue({data:{id:'col-1',name:'公开精选',description:'公开内容',visibility:'public',item_count:0,version:1}});api.deleteCollection.mockResolvedValue({data:{deleted:true}});api.setCollectionPost.mockResolvedValue({data:{changed:true}})
@@ -307,5 +308,184 @@ describe('FanBBS core interactions',()=>{
     await wrapper.find('.brand').trigger('click');await flushPromises();api.detail.mockResolvedValueOnce({data:{...samplePost(),id:'p-new',content:'新的详情',comments:9}});await wrapper.find('.post-content').trigger('click');await flushPromises()
     resolveReply({data:{id:'c-late',parent_id:'c-root',depth:1,author:root.author,content:'迟到的嵌套回复'}});await flushPromises()
     expect(wrapper.find('.detail-copy').text()).toBe('新的详情');expect(wrapper.find('.reply-count').text()).toBe('9');expect(wrapper.find('.comments').text()).not.toContain('迟到的嵌套回复');wrapper.unmount()
+  })
+})
+
+describe('inbox and author integration',()=>{
+  const openInbox=async wrapper=>{await wrapper.findAll('aside nav button').find(b=>b.text().includes('消息')).trigger('click');await flushPromises()}
+  it('keeps notification and chat unread totals separate and refreshes authoritative counts after reading',async()=>{
+    api.notificationCounts.mockResolvedValue({data:{total:3,by_type:{like:1,message:2}}});api.conversationCounts.mockResolvedValue({data:{conversations:1,messages:4}})
+    const wrapper=await render({authenticated:true});await openInbox(wrapper)
+    expect(wrapper.findAll('.message-tabs button').map(b=>b.text())).toEqual(['通知3','私信4'])
+    api.notificationCounts.mockResolvedValue({data:{total:0,by_type:{}}});await wrapper.find('.section-heading>.text-button').trigger('click');await flushPromises()
+    expect(wrapper.findAll('.message-tabs button').map(b=>b.text())).toEqual(['通知','私信4']);expect(api.readNotifications).toHaveBeenCalledWith([]);wrapper.unmount()
+  })
+  it('preserves the filter on pagination and ignores pages returned after a filter switch',async()=>{
+    api.notifications.mockResolvedValueOnce({data:[{id:'one',type:'like'}],page:{next_cursor:'all-next'}})
+    const wrapper=await render({authenticated:true});await openInbox(wrapper)
+    let finish;api.notifications.mockReturnValueOnce(new Promise(r=>{finish=r}));await wrapper.find('.load-more').trigger('click')
+    expect(api.notifications).toHaveBeenLastCalledWith('all-next',{type:'',unread:false})
+    api.notifications.mockResolvedValueOnce({data:[{id:'follow',type:'follow'}]});await wrapper.find('#notification-kind').setValue('follow');await flushPromises()
+    finish({data:[{id:'stale',type:'like',subject_id:'stale-secret'}],page:{next_cursor:'stale-next'}});await flushPromises()
+    expect(api.notifications).toHaveBeenLastCalledWith('',{type:'follow',unread:false});expect(wrapper.text()).not.toContain('stale-secret');expect(wrapper.find('.load-more').exists()).toBe(false);wrapper.unmount()
+  })
+  it('synchronizes muted messages without an inbox alert and refreshes receipts/counts',async()=>{
+    vi.useFakeTimers()
+    api.events.mockResolvedValueOnce({data:[],page:{next_cursor:'before'}}).mockResolvedValueOnce({data:[{type:'notification.created',notification:{id:'muted',muted:true,type:'message',payload:{conversation_id:'cnv-1'}}}],page:{next_cursor:'after'}})
+    const wrapper=await render({authenticated:true});await openInbox(wrapper);await wrapper.findAll('.message-tabs button')[1].trigger('click');await flushPromises();await wrapper.find('.conversation-row').trigger('click');await flushPromises()
+    api.messages.mockResolvedValueOnce({data:[{id:'silent',sender_id:'u-2',content:'静默同步消息'}]})
+    await vi.advanceTimersByTimeAsync(15000);await flushPromises()
+    expect(wrapper.text()).toContain('静默同步消息');expect(api.markConversationRead).toHaveBeenLastCalledWith('cnv-1','silent');expect(api.notifications).toHaveBeenCalledTimes(1);expect(wrapper.find('.toast').text()).toBe('');wrapper.unmount();vi.useRealTimers()
+  })
+  it('hides stale counts on failure and exposes a retry instead of zero unread claims',async()=>{
+    api.notificationCounts.mockRejectedValue(new Error('计数服务失败'))
+    const wrapper=await render({authenticated:true});await openInbox(wrapper)
+    expect(wrapper.text()).toContain('未读数暂时无法更新');expect(wrapper.findAll('.unread-badge')).toHaveLength(0)
+    api.notificationCounts.mockResolvedValue({data:{total:2,by_type:{like:2}}});await wrapper.findAll('button').find(b=>b.text()==='重试未读数').trigger('click');await flushPromises();expect(wrapper.findAll('.message-tabs button')[0].text()).toBe('通知2');wrapper.unmount()
+  })
+  it('routes a private moderation notice to the owner snapshot, never the public post endpoint',async()=>{
+    api.notifications.mockResolvedValue({data:[{id:'review',type:'moderation',subject_type:'post',subject_id:'private-post',payload:{decision:'rejected'}}]})
+    const wrapper=await render({authenticated:true});await openInbox(wrapper);await wrapper.find('.notification-action').trigger('click');await flushPromises()
+    expect(location.hash).toBe('#submission-private-post');expect(api.ownPost).toHaveBeenCalledWith('private-post');expect(api.detail).not.toHaveBeenCalled();expect(wrapper.find('.author-workspace').exists()).toBe(true);wrapper.unmount()
+  })
+  it('submits for review without leaking unpublished content into the public timeline',async()=>{
+    api.createPost.mockResolvedValueOnce({data:{...samplePost(),id:'pending-one',status:'pending',content:'等待审核的正文'}})
+    api.ownPost.mockResolvedValueOnce({data:{post:{...samplePost(),id:'pending-one',status:'pending',content:'等待审核的正文'},moderation:{state:'pending'}}})
+    const wrapper=await render({authenticated:true});await wrapper.find('.top-actions [aria-label="发布"]').trigger('click');await flushPromises();await wrapper.find('#draft').setValue('等待审核的正文');await wrapper.find('#compose-status').setValue('pending');await wrapper.find('.composer-form').trigger('submit');await flushPromises()
+    expect(api.createPost.mock.calls[0][0].status).toBe('pending');expect(location.hash).toBe('#submission-pending-one');expect(wrapper.text()).toContain('等待审核的正文');expect(wrapper.text()).toContain('稿件已提交')
+    await wrapper.find('.brand').trigger('click');await flushPromises();expect(wrapper.find('.timeline').text()).not.toContain('等待审核的正文');wrapper.unmount()
+  })
+  it('hydrates a private detail through the login gate',async()=>{
+    const wrapper=await render();history.replaceState({},'','#submission-private');dispatchEvent(new PopStateEvent('popstate'));await flushPromises();expect(wrapper.find('[role="dialog"]').exists()).toBe(true);expect(api.ownPost).not.toHaveBeenCalled()
+    api.login.mockResolvedValueOnce({data:{access_token:'access',refresh_token:'refresh',user:{id:'u-1',handle:'tester',name:'测试者'}}})
+    await wrapper.find('#identity').setValue('tester');await wrapper.find('#password').setValue('password');await wrapper.find('.dialog form').trigger('submit');await flushPromises();expect(api.ownPost).toHaveBeenCalledWith('private');expect(wrapper.find('.author-workspace').exists()).toBe(true);wrapper.unmount()
+  })
+})
+
+describe('review regression: deferred inbox and chat responses',()=>{
+  const inbox=async wrapper=>{await wrapper.findAll('aside nav button').find(b=>b.text().includes('消息')).trigger('click');await flushPromises()}
+  const chat=async wrapper=>{await inbox(wrapper);await wrapper.findAll('.message-tabs button')[1].trigger('click');await flushPromises()}
+  it('refreshes an event that arrives during an older notification snapshot request',async()=>{
+    vi.useFakeTimers();let wrapper
+    try{
+      api.events.mockResolvedValueOnce({data:[],page:{next_cursor:'before'}}).mockResolvedValueOnce({data:[{type:'notification.created',notification:{id:'new-event',type:'follow'}}],page:{next_cursor:'after'}})
+      wrapper=await render({authenticated:true});await inbox(wrapper)
+      let old;api.notifications.mockReturnValueOnce(new Promise(r=>{old=r})).mockResolvedValueOnce({data:[{id:'new',type:'follow',actor:{display_name:'新到达的用户'}}]})
+      await wrapper.find('#notification-kind').setValue('follow');await vi.advanceTimersByTimeAsync(15000);await flushPromises()
+      old({data:[]});await flushPromises()
+      expect(wrapper.text()).toContain('新到达的用户');expect(api.notifications).toHaveBeenCalledTimes(3)
+    }finally{wrapper?.unmount();vi.useRealTimers()}
+  })
+  it.each(['reload','page'])('cannot resurrect unread rows from a delayed %s after mark-all commits',async source=>{
+    const notice={id:'old',type:'follow',actor:{display_name:'旧通知'},read_at:null}
+    api.notifications.mockResolvedValueOnce({data:[notice],page:{next_cursor:'older'}})
+    const wrapper=await render({authenticated:true});await inbox(wrapper)
+    try{
+      let stale;api.notifications.mockReturnValueOnce(new Promise(r=>{stale=r})).mockResolvedValueOnce({data:[{...notice,read_at:'2026-10-11T12:00:00Z'}]})
+      if(source==='reload')await wrapper.find('#notification-kind').setValue('follow');else await wrapper.find('.load-more').trigger('click')
+      await wrapper.find('.section-heading>.text-button').trigger('click');await flushPromises()
+      stale({data:[{...notice,id:source==='page'?'other-old':'old'}]});await flushPromises()
+      expect(api.readNotifications).toHaveBeenCalledWith([]);expect(wrapper.findAll('.notification.unread')).toHaveLength(0)
+      expect(wrapper.findAll('.notification-action')).toHaveLength(1)
+    }finally{wrapper.unmount()}
+  })
+  it('refreshes counts and the visible list when a receipt commits after Back',async()=>{
+    const wrapper=await render({authenticated:true});await chat(wrapper)
+    try{
+      let receipt,oldList;api.markConversationRead.mockReturnValueOnce(new Promise(r=>{receipt=r}));await wrapper.find('.conversation-row').trigger('click');await flushPromises()
+      api.conversations.mockReturnValueOnce(new Promise(r=>{oldList=r})).mockResolvedValueOnce({data:[{id:'cnv-1',title:'会话',unread_count:0}]})
+      await wrapper.find('.conversation-heading .back').trigger('click');await flushPromises()
+      const countCalls=api.conversationCounts.mock.calls.length;receipt({data:{changed:true}});await flushPromises()
+      oldList({data:[{id:'cnv-1',title:'会话',unread_count:4}]});await flushPromises()
+      expect(api.conversationCounts.mock.calls.length).toBeGreaterThan(countCalls);expect(wrapper.findAll('.conversation-row .unread-badge')).toHaveLength(0)
+    }finally{wrapper.unmount()}
+  })
+  it('discards and deduplicates old-message pages across conversation switches',async()=>{
+    api.conversations.mockResolvedValue({data:[{id:'cnv-1',title:'会话 A'},{id:'cnv-2',title:'会话 B'}]})
+    api.messages.mockResolvedValueOnce({data:[{id:'a-new',content:'A 最近消息'}],page:{next_cursor:'a-older'}})
+    const wrapper=await render({authenticated:true});await chat(wrapper)
+    try{
+      await wrapper.findAll('.conversation-row')[0].trigger('click');await flushPromises();let old
+      api.messages.mockReturnValueOnce(new Promise(r=>{old=r}));await wrapper.find('.load-more').trigger('click');await wrapper.find('.load-more').trigger('click')
+      expect(api.messages).toHaveBeenCalledTimes(2)
+      await wrapper.find('.conversation-heading .back').trigger('click');await flushPromises()
+      api.conversation.mockResolvedValueOnce({data:{id:'cnv-2',members:[]}});api.messages.mockResolvedValueOnce({data:[{id:'b-new',content:'B 当前消息'}]})
+      await wrapper.findAll('.conversation-row')[1].trigger('click');await flushPromises();old({data:[{id:'a-old',content:'A 私有历史不可放进 B'}]});await flushPromises()
+      expect(wrapper.find('.message-thread').text()).toContain('B 当前消息');expect(wrapper.text()).not.toContain('A 私有历史不可放进 B')
+    }finally{wrapper.unmount()}
+  })
+})
+
+describe('review regression: mutation boundaries and owner changes',()=>{
+  it('keeps a newer unread moderation notice when mark-all response arrives after a poll',async()=>{
+    vi.useFakeTimers();let wrapper
+    try{
+      const prior={id:'prior',type:'follow',read_at:null},fresh={id:'fresh',type:'moderation',subject_type:'post',subject_id:'new-private',payload:{decision:'rejected'},read_at:null}
+      api.notifications.mockResolvedValue({data:[prior]});api.events.mockResolvedValueOnce({data:[],page:{next_cursor:'before'}}).mockResolvedValueOnce({data:[{type:'notification.created',notification:fresh}],page:{next_cursor:'after'}})
+      wrapper=await render({authenticated:true});await wrapper.findAll('aside nav button').find(b=>b.text().includes('消息')).trigger('click');await flushPromises()
+      let finish;api.readNotifications.mockReturnValueOnce(new Promise(r=>{finish=r}));await wrapper.find('.section-heading>.text-button').trigger('click')
+      api.notifications.mockResolvedValue({data:[fresh,{...prior,read_at:'2026-10-11T12:00:00Z'}]});api.notificationCounts.mockResolvedValue({data:{total:1,by_type:{moderation:1}}})
+      await vi.advanceTimersByTimeAsync(15000);await flushPromises();finish({data:{read:true}});await flushPromises()
+      expect(wrapper.findAll('.notification.unread')).toHaveLength(1);expect(wrapper.find('.notification.unread').text()).toContain('new-private');expect(wrapper.findAll('.message-tabs button')[0].text()).toBe('通知1')
+    }finally{wrapper?.unmount();vi.useRealTimers()}
+  })
+  it('cannot append a previous owner conversation page after logout and login',async()=>{
+    api.conversations.mockResolvedValueOnce({data:[{id:'a',title:'账号 A'}],page:{next_cursor:'owner-a-next'}})
+    const wrapper=await render({authenticated:true})
+    try{
+      await wrapper.findAll('aside nav button').find(b=>b.text().includes('消息')).trigger('click');await flushPromises();await wrapper.findAll('.message-tabs button')[1].trigger('click');await flushPromises()
+      let stale;api.conversations.mockReturnValueOnce(new Promise(r=>{stale=r}));await wrapper.find('.load-more').trigger('click');await wrapper.find('.load-more').trigger('click');expect(api.conversations).toHaveBeenCalledTimes(2)
+      await wrapper.find('.user-chip').trigger('click');await flushPromises();await wrapper.findAll('button').find(b=>b.text()==='退出登录').trigger('click');await flushPromises()
+      api.login.mockResolvedValueOnce({data:{access_token:'owner-b',refresh_token:'refresh-b',user:{id:'u-b',handle:'owner_b',name:'账号 B'}}})
+      await wrapper.findAll('aside nav button').find(b=>b.text().includes('消息')).trigger('click');await flushPromises();await wrapper.find('#identity').setValue('owner_b');await wrapper.find('#password').setValue('password');await wrapper.find('.dialog form').trigger('submit');await flushPromises()
+      api.conversations.mockResolvedValueOnce({data:[{id:'b',title:'账号 B 的会话'}]});await wrapper.findAll('.message-tabs button')[1].trigger('click');await flushPromises()
+      stale({data:[{id:'a-secret',title:'账号 A 的私密预览'}]});await flushPromises();expect(wrapper.text()).toContain('账号 B 的会话');expect(wrapper.text()).not.toContain('账号 A 的私密预览')
+    }finally{wrapper.unmount()}
+  })
+  it('keeps a content-removal moderation notice usable without routing to a deleted snapshot',async()=>{
+    api.notifications.mockResolvedValue({data:[{id:'removed',type:'moderation',subject_type:'post',subject_id:'deleted-post',payload:{decision:'remove_content'}}]})
+    const wrapper=await render({authenticated:true})
+    try{
+      await wrapper.findAll('aside nav button').find(b=>b.text().includes('消息')).trigger('click');await flushPromises();await wrapper.find('.notification-action').trigger('click');await flushPromises()
+      expect(api.readNotifications).toHaveBeenCalledWith(['removed']);expect(api.ownPost).not.toHaveBeenCalled();expect(api.detail).not.toHaveBeenCalled();expect(location.hash).toBe('#messages');expect(wrapper.find('.toast').text()).toBe('这条帖子已被移除。')
+    }finally{wrapper.unmount()}
+  })
+})
+
+describe('review regression: expired authentication clears private UI',()=>{
+  it('removes the private author snapshot and pending private state when the adapter clears a failed session',async()=>{
+    const wrapper=await render({authenticated:true})
+    try{
+      api.ownPost.mockResolvedValueOnce({data:{post:{...samplePost(),id:'private',status:'rejected',content:'过期后不应继续显示的私有内容'},moderation:{state:'rejected',reason:'私有审核理由'}}})
+      history.replaceState({},'','#submission-private');dispatchEvent(new PopStateEvent('popstate'));await flushPromises()
+      expect(wrapper.text()).toContain('过期后不应继续显示的私有内容')
+      const {clearSession}=await import('../src/api.js');clearSession('expired');await flushPromises()
+      expect(wrapper.find('.author-workspace').exists()).toBe(false);expect(wrapper.text()).not.toContain('私有审核理由');expect(wrapper.text()).not.toContain('过期后不应继续显示的私有内容')
+      expect(wrapper.find('.user-chip').exists()).toBe(false);expect(location.hash).toBe('#home');expect(wrapper.find('.toast').text()).toContain('登录已失效');expect(sessionStorage.getItem('fanbbs_user')).toBeNull()
+    }finally{wrapper.unmount()}
+  })
+})
+
+describe('review regression: composer ownership',()=>{
+  it('clears an authenticated author draft and file selection before another account can compose',async()=>{
+    const wrapper=await render({authenticated:true})
+    try{
+      await wrapper.find('.top-actions [aria-label="发布"]').trigger('click');await flushPromises()
+      await wrapper.find('#draft').setValue('账号 A 的未发私稿');await wrapper.find('#compose-title-field').setValue('账号 A 的标题');await wrapper.find('#compose-summary').setValue('账号 A 的摘要');await wrapper.find('#compose-status').setValue('pending')
+      const picker=wrapper.find('.media-picker input');Object.defineProperty(picker.element,'files',{value:[new File(['private'],'account-a-private.png',{type:'image/png'})],configurable:true});await picker.trigger('change')
+      expect(localStorage.getItem('fanbbs_draft')).toBe('账号 A 的未发私稿')
+      const {clearSession}=await import('../src/api.js');clearSession('expired');await flushPromises();expect(localStorage.getItem('fanbbs_draft')).toBeNull()
+      api.login.mockResolvedValueOnce({data:{access_token:'owner-b',refresh_token:'refresh-b',user:{id:'u-b',handle:'owner_b',name:'账号 B'}}})
+      await wrapper.find('.top-actions [aria-label="发布"]').trigger('click');await flushPromises();await wrapper.find('#identity').setValue('owner_b');await wrapper.find('#password').setValue('password');await wrapper.find('.dialog form').trigger('submit');await flushPromises()
+      expect(wrapper.find('#draft').element.value).toBe('');expect(wrapper.find('#compose-title-field').element.value).toBe('');expect(wrapper.find('#compose-summary').element.value).toBe('');expect(wrapper.find('#compose-status').element.value).toBe('');expect(wrapper.find('.selected-media').exists()).toBe(false)
+    }finally{wrapper.unmount()}
+  })
+  it('preserves an anonymous pre-login draft when its author logs in to publish',async()=>{
+    localStorage.setItem('fanbbs_draft','登录前的草稿');const wrapper=await render()
+    try{
+      api.login.mockResolvedValueOnce({data:{access_token:'owner',refresh_token:'refresh',user:{id:'u-1',handle:'tester',name:'测试者'}}})
+      await wrapper.find('.top-actions [aria-label="发布"]').trigger('click');await flushPromises();await wrapper.find('#identity').setValue('tester');await wrapper.find('#password').setValue('password');await wrapper.find('.dialog form').trigger('submit');await flushPromises()
+      expect(wrapper.find('#draft').element.value).toBe('登录前的草稿')
+    }finally{wrapper.unmount()}
   })
 })

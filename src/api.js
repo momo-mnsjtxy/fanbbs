@@ -32,20 +32,30 @@ export function normalizeComment(comment = {}) {
   return { ...comment, author: normalizeUser(comment.author), content: comment.body || comment.content || '', age: comment.created_at ? new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(comment.created_at)) : '刚刚' }
 }
 
-export function clearSession() {
+export function clearSession(reason = 'cleared') {
   sessionStorage.removeItem('fanbbs_access_token'); sessionStorage.removeItem('fanbbs_refresh_token'); sessionStorage.removeItem('fanbbs_user')
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('fanbbs:session-cleared', {detail:{reason}}))
 }
 
 export async function refreshSession() {
-  const refreshToken = sessionStorage.getItem('fanbbs_refresh_token')
+  const refreshToken = sessionStorage.getItem('fanbbs_refresh_token'), accessToken = sessionStorage.getItem('fanbbs_access_token')
   if (!refreshToken) return null
   const response = await fetch(`${API_BASE}/auth/refresh`, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: refreshToken }) })
   const payload = await response.json().catch(() => ({}))
-  if (!response.ok) { clearSession(); return null }
+  // A delayed refresh from an older login must not replace or clear a newer one.
+  if (sessionStorage.getItem('fanbbs_refresh_token') !== refreshToken || sessionStorage.getItem('fanbbs_access_token') !== accessToken) return null
+  if (!response.ok) { clearSession('expired'); return null }
   sessionStorage.setItem('fanbbs_access_token', payload.data.access_token)
   sessionStorage.setItem('fanbbs_refresh_token', payload.data.refresh_token)
   if (payload.data.user) sessionStorage.setItem('fanbbs_user', JSON.stringify(normalizeUser(payload.data.user)))
   return payload.data
+}
+
+async function renewOrClearSession(expectedToken) {
+  if (sessionStorage.getItem('fanbbs_access_token') !== expectedToken) return null
+  const renewed = await refreshSession().catch(() => null)
+  if (!renewed && sessionStorage.getItem('fanbbs_access_token') === expectedToken) clearSession('expired')
+  return renewed
 }
 
 async function request(path, options = {}, retried = false) {
@@ -55,12 +65,37 @@ async function request(path, options = {}, retried = false) {
   try { response = await fetch(`${API_BASE}${path}`, { ...options, headers }) } catch { throw new ApiError('无法连接社区服务', { code: 'network_error' }) }
   const payload = await response.json().catch(() => ({}))
   if (response.status === 401 && token && !retried && !path.startsWith('/auth/')) {
-    const renewed = await refreshSession().catch(() => null)
+    const renewed = await renewOrClearSession(token)
     if (renewed) return request(path, options, true)
     if (!options.method || options.method === 'GET') return request(path, options, true)
   }
   if (!response.ok) throw normalizeApiError(payload, response.status)
   return payload
+}
+
+// Fetch only the configured API's canonical media route, never a metadata URL.
+// Native img/video requests cannot read bearer-authenticated private attachments.
+export async function fetchMediaBlob(id, { signal } = {}, retried = false) {
+  const token = sessionStorage.getItem('fanbbs_access_token')
+  let response
+  try {
+    response = await fetch(`${API_BASE}/media/${encodeURIComponent(id)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      signal, cache: 'no-store', redirect: 'error'
+    })
+  } catch (error) {
+    if (error.name === 'AbortError') throw error
+    throw new ApiError('无法加载稿件附件', { code: 'network_error' })
+  }
+  if (response.status === 401 && token && !retried && await renewOrClearSession(token)) {
+    return fetchMediaBlob(id, { signal }, true)
+  }
+  if (!response.ok) throw normalizeApiError(await response.json().catch(() => ({})), response.status)
+  const blob = await response.blob()
+  if (!['image/jpeg','image/png','image/gif','image/webp','video/mp4'].includes(blob.type)) {
+    throw new ApiError('不支持预览这个附件格式', { code: 'unsupported_media' })
+  }
+  return blob
 }
 
 export const api = {
@@ -104,7 +139,13 @@ export const api = {
   ,categoryFollows: (cursor='') => request(`/me/category-follows?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
   ,sessions: () => request('/me/sessions')
   ,revokeSession: id => request(`/me/sessions/${encodeURIComponent(id)}`, { method:'DELETE' })
-  ,notifications: (cursor='') => request(`/notifications?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
+  ,notifications: (cursor='', { type='', unread=false }={}) => { const params=new URLSearchParams({limit:'30'});if(type)params.set('type',type);if(unread)params.set('unread','true');if(cursor)params.set('cursor',cursor);return request(`/notifications?${params}`) }
+  ,notificationCounts: () => request('/notifications/counts')
+  ,notificationPreferences: () => request('/me/notification-preferences')
+  ,updateNotificationPreferences: preferences => request('/me/notification-preferences', {method:'PATCH',body:JSON.stringify({preferences})})
+  ,conversationCounts: () => request('/conversations/counts')
+  ,ownPosts: async (status='',cursor='') => { const params=new URLSearchParams({limit:'20'});if(status)params.set('status',status);if(cursor)params.set('cursor',cursor);const r=await request(`/me/posts?${params}`);return {...r,data:(r.data||[]).map(normalizePost)} }
+  ,ownPost: async id => { const r=await request(`/me/posts/${encodeURIComponent(id)}`);return {...r,data:{...r.data,post:normalizePost(r.data.post)}} }
   ,readNotifications: ids => request('/notifications/read', { method: 'PUT', body: JSON.stringify({ ids }) })
   ,report: (targetType, targetId, reason) => request('/reports', { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ target_type: targetType, target_id: targetId, reason }) })
   ,updatePost: async (id, version, input) => { const update = typeof input === 'string' ? { content: input } : input; const r = await request(`/posts/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'If-Match': `"${version}"` }, body: JSON.stringify(update) }); return { ...r, data: normalizePost(r.data) } }
@@ -184,7 +225,7 @@ export async function uploadFile(file, { avatar = false, cover = false, altText 
     let response
     const accountMediaPath = cover ? '/me/cover' : '/me/avatar'
     try { response = await fetch(`${API_BASE}${avatar || cover ? accountMediaPath : '/uploads'}`, { method: avatar || cover ? 'PUT' : 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form }) } catch { throw new ApiError('无法连接社区服务', { code: 'network_error' }) }
-    if (response.status === 401 && !retried && await refreshSession().catch(()=>null)) return send(true)
+    if (response.status === 401 && !retried && await renewOrClearSession(token)) return send(true)
     const payload = await response.json().catch(()=>({}))
     if (!response.ok) throw normalizeApiError(payload,response.status)
     return payload
