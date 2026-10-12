@@ -158,6 +158,7 @@ export const api = {
   ,deleteComment: (postId, commentId, version) => request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
   ,likeComment: (postId, commentId, liked) => request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/reactions/like`, { method: liked ? 'DELETE' : 'PUT' })
   ,adminReview: (status='open', cursor='') => request(`/admin/reports?status=${encodeURIComponent(status)}&limit=30&cursor=${encodeURIComponent(cursor)}`)
+  ,myReport: id => request(`/me/reports/${encodeURIComponent(id)}`)
   ,myReports: (status='',cursor='') => request(`/me/reports?status=${encodeURIComponent(status)}&limit=20&cursor=${encodeURIComponent(cursor)}`)
   ,reportContext: id => request(`/admin/reports/${encodeURIComponent(id)}`)
   ,moderate: (id, decision, reason, version) => request(`/admin/reports/${encodeURIComponent(id)}/decision`, { method: 'POST', headers: version ? {'If-Match': `"${version}"`} : {}, body: JSON.stringify({ decision, reason }) })
