@@ -156,8 +156,10 @@ export const api = {
   ,updateComment: async (postId, commentId, version, content) => { const r = await request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'PATCH', headers: { 'If-Match': `"${version}"` }, body: JSON.stringify({ content }) }); return { ...r, data: normalizeComment(r.data) } }
   ,deleteComment: (postId, commentId, version) => request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
   ,likeComment: (postId, commentId, liked) => request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/reactions/like`, { method: liked ? 'DELETE' : 'PUT' })
-  ,adminReview: () => request('/admin/reports?status=open&limit=30')
-  ,moderate: (id, decision, reason) => request(`/admin/reports/${encodeURIComponent(id)}/decision`, { method: 'POST', body: JSON.stringify({ decision, reason }) })
+  ,adminReview: (status='open', cursor='') => request(`/admin/reports?status=${encodeURIComponent(status)}&limit=30&cursor=${encodeURIComponent(cursor)}`)
+  ,myReports: (status='',cursor='') => request(`/me/reports?status=${encodeURIComponent(status)}&limit=20&cursor=${encodeURIComponent(cursor)}`)
+  ,reportContext: id => request(`/admin/reports/${encodeURIComponent(id)}`)
+  ,moderate: (id, decision, reason, version) => request(`/admin/reports/${encodeURIComponent(id)}/decision`, { method: 'POST', headers: version ? {'If-Match': `"${version}"`} : {}, body: JSON.stringify({ decision, reason }) })
   ,moderatePost: (id,decision,reason,version) => request(`/admin/posts/${encodeURIComponent(id)}/moderation`,{method:'POST',headers:version?{'If-Match':`"${version}"`}:{},body:JSON.stringify({decision,reason})})
   ,postControls: (id,input) => request(`/admin/posts/${encodeURIComponent(id)}/controls`,{method:'PATCH',body:JSON.stringify(input)})
   ,adminUsers: ({status='',role='',q='',cursor=''}={}) => { const params=new URLSearchParams({limit:'50'});if(status)params.set('status',status);if(role)params.set('role',role);if(q)params.set('q',q);if(cursor)params.set('cursor',cursor);return request(`/admin/users?${params}`) }
