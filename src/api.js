@@ -75,11 +75,11 @@ async function request(path, options = {}, retried = false) {
 
 // Fetch only the configured API's canonical media route, never a metadata URL.
 // Native img/video requests cannot read bearer-authenticated private attachments.
-export async function fetchMediaBlob(id, { signal } = {}, retried = false) {
+export async function fetchMediaBlob(id, { signal, reviewPostId = '' } = {}, retried = false) {
   const token = sessionStorage.getItem('fanbbs_access_token')
   let response
   try {
-    response = await fetch(`${API_BASE}/media/${encodeURIComponent(id)}`, {
+    response = await fetch(`${API_BASE}${reviewPostId?`/admin/posts/${encodeURIComponent(reviewPostId)}/media`:'/media'}/${encodeURIComponent(id)}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       signal, cache: 'no-store', redirect: 'error'
     })
@@ -88,7 +88,7 @@ export async function fetchMediaBlob(id, { signal } = {}, retried = false) {
     throw new ApiError('无法加载稿件附件', { code: 'network_error' })
   }
   if (response.status === 401 && token && !retried && await renewOrClearSession(token)) {
-    return fetchMediaBlob(id, { signal }, true)
+    return fetchMediaBlob(id, { signal, reviewPostId }, true)
   }
   if (!response.ok) throw normalizeApiError(await response.json().catch(() => ({})), response.status)
   const blob = await response.blob()
@@ -158,11 +158,13 @@ export const api = {
   ,likeComment: (postId, commentId, liked) => request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}/reactions/like`, { method: liked ? 'DELETE' : 'PUT' })
   ,adminReview: () => request('/admin/reports?status=open&limit=30')
   ,moderate: (id, decision, reason) => request(`/admin/reports/${encodeURIComponent(id)}/decision`, { method: 'POST', body: JSON.stringify({ decision, reason }) })
-  ,moderatePost: (id,decision,reason) => request(`/admin/posts/${encodeURIComponent(id)}/moderation`,{method:'POST',body:JSON.stringify({decision,reason})})
+  ,moderatePost: (id,decision,reason,version) => request(`/admin/posts/${encodeURIComponent(id)}/moderation`,{method:'POST',headers:version?{'If-Match':`"${version}"`}:{},body:JSON.stringify({decision,reason})})
   ,postControls: (id,input) => request(`/admin/posts/${encodeURIComponent(id)}/controls`,{method:'PATCH',body:JSON.stringify(input)})
   ,adminUsers: ({status='',role='',q='',cursor=''}={}) => { const params=new URLSearchParams({limit:'50'});if(status)params.set('status',status);if(role)params.set('role',role);if(q)params.set('q',q);if(cursor)params.set('cursor',cursor);return request(`/admin/users?${params}`) }
   ,setUserStatus: (id,status,reason) => request(`/admin/users/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason }) })
-  ,adminContent: ({status='published',type='',q=''}={}) => request(`/admin/content?status=${encodeURIComponent(status)}&type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&limit=50`)
+  ,adminContent: ({status='published',type='',q=''}={},cursor='') => request(`/admin/content?status=${encodeURIComponent(status)}&type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
+  ,adminSubmission: async id => {const r=await request(`/admin/posts/${encodeURIComponent(id)}`);return {...r,data:{...r.data,post:normalizePost(r.data.post)}}}
+  ,submissionHistory: (id,cursor='') => request(`/admin/posts/${encodeURIComponent(id)}/review-history?limit=20${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
   ,createCategory: input => request('/admin/categories', { method:'POST', body:JSON.stringify(input) })
   ,updateCategory: (id,input) => request(`/admin/categories/${encodeURIComponent(id)}`, { method:'PATCH', body:JSON.stringify(input) })
   ,deleteCategory: (id,reason) => request(`/admin/categories/${encodeURIComponent(id)}`, { method:'DELETE', body:JSON.stringify({reason}) })

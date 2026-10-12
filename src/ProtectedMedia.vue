@@ -2,7 +2,7 @@
 import { onUnmounted, ref, watch } from 'vue'
 import { fetchMediaBlob } from './api.js'
 
-const props = defineProps({ media: {type:Array, default:() => []} })
+const props = defineProps({ media: {type:Array, default:() => []}, reviewPostId: {type:String, default:''} })
 const items = ref([])
 let generation = 0, controller
 const urls = new Set()
@@ -19,7 +19,7 @@ async function load() {
   items.value = props.media.map(media => ({id:media.id, label:media.alt_text || media.original_name || '稿件附件', url:'', type:'', error:''}))
   await Promise.all(items.value.map(async item => {
     try {
-      const blob = await fetchMediaBlob(item.id, {signal})
+      const blob = await fetchMediaBlob(item.id, {signal,reviewPostId:props.reviewPostId})
       if (current !== generation) return
       const url = URL.createObjectURL(blob)
       urls.add(url); item.type = blob.type; item.url = url
@@ -28,7 +28,7 @@ async function load() {
     }
   }))
 }
-watch(() => props.media, load, {immediate:true})
+watch(() => [props.media,props.reviewPostId], load, {immediate:true})
 onUnmounted(cleanup)
 </script>
 

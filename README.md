@@ -67,3 +67,7 @@ verify this continuation. Run the isolated live checks with
 ### Author submission flow (October 12)
 
 Composer can save a server draft. The author workspace now edits draft/rejected/published content, saves with If-Match, submits/re-submits with a reason, withdraws pending review before editing and deletes non-pending private drafts. Moderation queue filters include pending/rejected and display submission text. Requires the matching `/me/posts/{id}/review` backend. Vite build passed; browser/full regression acceptance has not run in this feature-first pass.
+
+### Moderator workbench
+
+Content administration opens a full private reading pane rather than sending pending posts to an inaccessible public detail URL. It includes status/type/search filters, pagination, authenticated image/video preview, submit/withdraw/decision history, version-bound approval/rejection and audited published pin/recommend controls. Requires the matching backend review endpoints. Build and one API smoke only; browser acceptance remains pending.
