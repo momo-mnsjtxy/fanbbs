@@ -165,8 +165,11 @@ export const api = {
   ,moderatePost: (id,decision,reason,version) => request(`/admin/posts/${encodeURIComponent(id)}/moderation`,{method:'POST',headers:version?{'If-Match':`"${version}"`}:{},body:JSON.stringify({decision,reason})})
   ,setCommentLock: (id,version,locked,reason) => request(`/admin/posts/${encodeURIComponent(id)}/comments-lock`,{method:'PUT',headers:{'If-Match':`"${version}"`},body:JSON.stringify({locked,reason})})
   ,postControls: (id,input) => request(`/admin/posts/${encodeURIComponent(id)}/controls`,{method:'PATCH',body:JSON.stringify(input)})
+  ,adminUser: id => request(`/admin/users/${encodeURIComponent(id)}`)
+  ,userModerationHistory: (id,cursor='') => request(`/admin/users/${encodeURIComponent(id)}/moderation-history?limit=20&cursor=${encodeURIComponent(cursor)}`)
+  ,revokeUserSessions: (id,reason) => request(`/admin/users/${encodeURIComponent(id)}/sessions/revoke`,{method:'POST',body:JSON.stringify({reason})})
   ,adminUsers: ({status='',role='',q='',cursor=''}={}) => { const params=new URLSearchParams({limit:'50'});if(status)params.set('status',status);if(role)params.set('role',role);if(q)params.set('q',q);if(cursor)params.set('cursor',cursor);return request(`/admin/users?${params}`) }
-  ,setUserStatus: (id,status,reason) => request(`/admin/users/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason }) })
+  ,setUserStatus: (id,status,reason,expectedStatus) => request(`/admin/users/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason, ...(expectedStatus?{expected_status:expectedStatus}:{}) }) })
   ,adminContent: ({status='published',type='',q=''}={},cursor='') => request(`/admin/content?status=${encodeURIComponent(status)}&type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
   ,adminSubmission: async id => {const r=await request(`/admin/posts/${encodeURIComponent(id)}`);return {...r,data:{...r.data,post:normalizePost(r.data.post)}}}
   ,submissionHistory: (id,cursor='') => request(`/admin/posts/${encodeURIComponent(id)}/review-history?limit=20${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)

@@ -71,3 +71,11 @@ Composer can save a server draft. The author workspace now edits draft/rejected/
 ### Moderator workbench
 
 Content administration opens a full private reading pane rather than sending pending posts to an inaccessible public detail URL. It includes status/type/search filters, pagination, authenticated image/video preview, submit/withdraw/decision history, version-bound approval/rejection and audited published pin/recommend controls. Requires the matching backend review endpoints. Build and one API smoke only; browser acceptance remains pending.
+
+### October 12 feature checkpoints
+
+The author workspace now manages persistent drafts, submission/withdrawal/resubmission, ordered attachment changes and immutable revision recovery. Revision restoration explicitly confirms historical visibility and retains the current attachment list and publication status.
+
+The administrator workspaces provide complete private review context with authenticated attachments, version-aware decisions, discussion close/reopen controls, report-context review, personal report outcomes and deep links, and administrator-only account/session controls with scoped audit history. Feed and detail attachments use authenticated reads; feed media starts loading near the viewport and is disposed when views or identities change.
+
+These features require the matching Go API through `1f61910` and forward migration 013. Reuse the pinned dependency lockfile. Feature-first validation used focused API smoke checks and Vue SFC compilation; full regression, final combined production build, PostgreSQL migration/concurrency and browser acceptance have not run for this combined checkpoint. Earlier screenshots and October 11 test totals do not verify these features.
