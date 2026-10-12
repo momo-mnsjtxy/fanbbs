@@ -162,6 +162,7 @@ export const api = {
   ,reportContext: id => request(`/admin/reports/${encodeURIComponent(id)}`)
   ,moderate: (id, decision, reason, version) => request(`/admin/reports/${encodeURIComponent(id)}/decision`, { method: 'POST', headers: version ? {'If-Match': `"${version}"`} : {}, body: JSON.stringify({ decision, reason }) })
   ,moderatePost: (id,decision,reason,version) => request(`/admin/posts/${encodeURIComponent(id)}/moderation`,{method:'POST',headers:version?{'If-Match':`"${version}"`}:{},body:JSON.stringify({decision,reason})})
+  ,setCommentLock: (id,version,locked,reason) => request(`/admin/posts/${encodeURIComponent(id)}/comments-lock`,{method:'PUT',headers:{'If-Match':`"${version}"`},body:JSON.stringify({locked,reason})})
   ,postControls: (id,input) => request(`/admin/posts/${encodeURIComponent(id)}/controls`,{method:'PATCH',body:JSON.stringify(input)})
   ,adminUsers: ({status='',role='',q='',cursor=''}={}) => { const params=new URLSearchParams({limit:'50'});if(status)params.set('status',status);if(role)params.set('role',role);if(q)params.set('q',q);if(cursor)params.set('cursor',cursor);return request(`/admin/users?${params}`) }
   ,setUserStatus: (id,status,reason) => request(`/admin/users/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason }) })

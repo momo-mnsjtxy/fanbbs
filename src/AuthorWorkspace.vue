@@ -109,7 +109,7 @@ watch(() => [props.postId,filter.value], load, {immediate:true})
     </template>
     <article v-if="!loading && snapshot" class="submission-detail">
       <span class="status-label" :data-status="snapshot.post.status">{{ stateLabel(snapshot.post.status) }}</span>
-      <h2>{{ snapshot.post.title || '未命名稿件' }}</h2>
+      <h2>{{ snapshot.post.title || '未命名稿件' }}</h2><p v-if="snapshot.post.comments_locked" role="status">管理员已关闭这篇帖子的新评论与回复。</p>
       <time :datetime="snapshot.post.created_at">{{ formattedDate(snapshot.post.created_at) }}</time>
       <section v-if="snapshot.moderation" class="review-snapshot" aria-label="审核信息"><h3>审核进度：{{ stateLabel(snapshot.moderation.state) }}</h3><p v-if="snapshot.moderation.reason">{{ snapshot.moderation.reason }}</p><p v-else-if="snapshot.moderation.state==='pending'">稿件正在等待审核。</p><time v-if="snapshot.moderation.decided_at" :datetime="snapshot.moderation.decided_at">{{ formattedDate(snapshot.moderation.decided_at) }}</time></section>
       <form v-if="editing" class="composer-form author-edit-form" @submit.prevent="saveEdit">
