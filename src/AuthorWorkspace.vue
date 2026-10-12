@@ -1,7 +1,8 @@
 <script setup>
 import { nextTick, onUnmounted, ref, watch } from 'vue'
-import { api } from './api.js'
+import { api, uploadFile } from './api.js'
 import ProtectedMedia from './ProtectedMedia.vue'
+import RevisionHistory from './RevisionHistory.vue'
 
 const props = defineProps({ postId: {type:String, default:''} })
 const emit = defineEmits(['open','back','published','create'])
@@ -9,13 +10,13 @@ const states = [['','全部'],['pending','待审核'],['rejected','未通过'],[
 const filter = ref(''), posts = ref([]), cursor = ref(''), snapshot = ref(null), loading = ref(false), paging = ref(false), error = ref('')
 const heading = ref(null)
 const editing = ref(false), saving = ref(false), notice = ref(''), reason = ref('')
-const categories = ref([]), tags = ref([])
+const categories = ref([]), tags = ref([]), attachments=ref([])
 const fields = ref({title:'',summary:'',content:'',category_id:'',tag_ids:[],visibility:'public'})
 async function startEdit() {
   if (saving.value || !snapshot.value) return
   const current = generation, post = snapshot.value.post
   fields.value = {title:post.title||'',summary:post.summary||'',content:post.content||'',category_id:post.category?.id||'',tag_ids:(post.tags||[]).map(tag=>tag.id),visibility:post.visibility||'public'}
-  editing.value = true; error.value = ''; notice.value = ''
+  attachments.value=(post.media||[]).map(media=>({key:media.id,media})); editing.value = true; error.value = ''; notice.value = ''
   try { const [c,t] = await Promise.all([api.categories(),api.tags()]); if(current===generation){categories.value=c.data||[];tags.value=t.data||[]} }
   catch(e){if(current===generation)error.value=e.message}
 }
@@ -32,7 +33,20 @@ async function mutate(work, success) {
   } catch(e){if(current===generation)error.value=e.code==='version_conflict'?'稿件版本已更新。请先复制未保存内容，再刷新稿件。':e.message}
   finally{if(current===generation)saving.value=false}
 }
-const saveEdit=()=>mutate(post=>api.updatePost(post.id,post.version,{...fields.value,tag_ids:[...fields.value.tag_ids]}),'稿件修改已保存')
+function chooseAttachments(event){
+ const files=Array.from(event.target.files||[]);event.target.value=''
+ if(saving.value)return
+ if(files.length+attachments.value.length>8){error.value='每份稿件最多 8 个附件。';return}
+ attachments.value.push(...files.map(file=>({key:crypto.randomUUID(),file})));error.value=''
+}
+function moveAttachment(index,delta){if(saving.value)return;const to=index+delta;if(to<0||to>=attachments.value.length)return;const [item]=attachments.value.splice(index,1);attachments.value.splice(to,0,item)}
+const saveEdit=()=>mutate(async post=>{
+ const selected=[...attachments.value],uploaded=[],ids=[],input={...fields.value,tag_ids:[...fields.value.tag_ids]}
+ try{
+  for(const item of selected){if(item.media)ids.push(item.media.id);else{const result=await uploadFile(item.file,{altText:item.file.name});uploaded.push(result.data.id);ids.push(result.data.id)}}
+  await api.updatePost(post.id,post.version,{...input,media_ids:ids})
+ }catch(e){await Promise.allSettled(uploaded.map(id=>api.abandonMedia(id)));throw e}
+},'稿件正文与附件已保存')
 const reviewAction=action=>mutate(post=>api.transitionSubmission(post.id,post.version,action,reason.value.trim()),action==='submit'?'稿件已送交审核':'稿件已撤回，可以继续编辑')
 async function removeDraft(){
   if(saving.value||!snapshot.value||!confirm('删除这份稿件？它将从工作台隐藏。'))return
@@ -41,7 +55,7 @@ async function removeDraft(){
   catch(e){if(current===generation)error.value=e.message}
   finally{if(current===generation)saving.value=false}
 }
-function reload(){if(editing.value&&!confirm('刷新将放弃尚未保存的修改，继续吗？'))return;load()}
+function reload(){if(saving.value)return;if(editing.value&&!confirm('刷新将放弃尚未保存的修改，继续吗？'))return;load()}
 
 let generation = 0
 onUnmounted(() => { generation++ })
@@ -104,6 +118,7 @@ watch(() => [props.postId,filter.value], load, {immediate:true})
         <label for="author-content">正文<textarea id="author-content" v-model="fields.content" required maxlength="50000" rows="12" :disabled="saving"></textarea></label>
         <div class="compose-grid"><label>分类<select v-model="fields.category_id" :disabled="saving"><option value="">不选择</option><option v-for="category in categories" :key="category.id" :value="category.id">{{category.name}}</option></select></label><label>可见范围<select v-model="fields.visibility" :disabled="saving"><option value="public">所有人</option><option value="followers">仅关注者</option></select></label></div>
         <fieldset class="tag-picker" :disabled="saving"><legend>标签（最多 10 个）</legend><label v-for="tag in tags" :key="tag.id"><input v-model="fields.tag_ids" type="checkbox" :value="tag.id" :disabled="!fields.tag_ids.includes(tag.id)&&fields.tag_ids.length>=10">{{tag.name}}</label></fieldset>
+        <fieldset class="author-attachment-editor" :disabled="saving"><legend>附件（{{attachments.length}} / 8）</legend><p>移除或调整顺序在保存稿件后生效，未关联的上传由现有清理规则处理。</p><ol><li v-for="(item,index) in attachments" :key="item.key"><span>{{item.media?.original_name||item.media?.alt_text||item.file?.name||'附件'}} <small>{{item.file?'待上传':'已保存'}}</small></span><button type="button" :disabled="index===0||saving" @click="moveAttachment(index,-1)" aria-label="附件上移">上移</button><button type="button" :disabled="index===attachments.length-1||saving" @click="moveAttachment(index,1)" aria-label="附件下移">下移</button><button type="button" :disabled="saving" @click="attachments.splice(index,1)">移除</button></li></ol><label>添加图片或视频<input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif,video/mp4" :disabled="saving||attachments.length>=8" @change="chooseAttachments"></label></fieldset>
         <div class="compose-actions"><button type="button" class="text-button" :disabled="saving" @click="cancelEdit">取消编辑</button><button class="primary" :disabled="saving||!fields.content.trim()">{{saving?'保存中…':'保存稿件'}}</button></div>
       </form>
       <section v-if="!editing" class="submission-actions" aria-label="稿件操作">
@@ -116,7 +131,12 @@ watch(() => [props.postId,filter.value], load, {immediate:true})
       </section>
       <p v-if="snapshot.post.summary" class="muted-copy">{{ snapshot.post.summary }}</p><div class="submission-body">{{ snapshot.post.content }}</div>
       <ProtectedMedia v-if="snapshot.post.media?.length" :media="snapshot.post.media" />
+      <RevisionHistory :key="snapshot.post.id" :post="snapshot.post" :disabled="saving||editing" @restored="snapshot.post=$event" @busy="saving=$event" />
       <button v-if="snapshot.post.status==='published'" class="outline" @click="emit('published', snapshot.post)">查看已发布的帖子</button>
     </article>
   </section>
 </template>
+
+<style scoped>
+.author-attachment-editor{border:1px solid var(--line,#ddd);border-radius:10px;padding:16px}.author-attachment-editor ol{padding:0;list-style:none}.author-attachment-editor li{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap}.author-attachment-editor li span{flex:1;min-width:140px;overflow-wrap:anywhere}.author-attachment-editor button{padding:6px;border:1px solid var(--line,#ddd);border-radius:6px}.author-attachment-editor small{color:var(--muted,#777)}
+</style>

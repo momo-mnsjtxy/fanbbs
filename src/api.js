@@ -151,7 +151,8 @@ export const api = {
   ,report: (targetType, targetId, reason) => request('/reports', { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ target_type: targetType, target_id: targetId, reason }) })
   ,updatePost: async (id, version, input) => { const update = typeof input === 'string' ? { content: input } : input; const r = await request(`/posts/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'If-Match': `"${version}"` }, body: JSON.stringify(update) }); return { ...r, data: normalizePost(r.data) } }
   ,deletePost: (id, version) => request(`/posts/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
-  ,postRevisions: id => request(`/posts/${encodeURIComponent(id)}/revisions?limit=50`)
+  ,postRevisions: (id,cursor='') => request(`/posts/${encodeURIComponent(id)}/revisions?limit=30&cursor=${encodeURIComponent(cursor)}`)
+  ,restoreRevision: (id,currentVersion,version,reason) => request(`/posts/${encodeURIComponent(id)}/revisions/restore`, {method:'POST',headers:{'If-Match':`"${currentVersion}"`},body:JSON.stringify({version,reason})}).then(result=>({...result,data:normalizePost(result.data)}))
   ,activity: () => request('/me/activity?limit=50')
   ,updateComment: async (postId, commentId, version, content) => { const r = await request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'PATCH', headers: { 'If-Match': `"${version}"` }, body: JSON.stringify({ content }) }); return { ...r, data: normalizeComment(r.data) } }
   ,deleteComment: (postId, commentId, version) => request(`/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
