@@ -9,6 +9,9 @@ const emit = defineEmits(['open','back','published','create'])
 const states = [['','全部'],['pending','待审核'],['rejected','未通过'],['published','已发布'],['draft','草稿']]
 const filter = ref(''), posts = ref([]), cursor = ref(''), snapshot = ref(null), loading = ref(false), paging = ref(false), error = ref('')
 const heading = ref(null)
+const searchText=ref(''),activeSearch=ref(''),kindFilter=ref('')
+function searchOwned(){const value=searchText.value.trim();if(Array.from(value).length>100){error.value='搜索词最多 100 个字符。';return}if(activeSearch.value===value)load();else activeSearch.value=value}
+function clearOwnedSearch(){searchText.value='';activeSearch.value='';kindFilter.value='';filter.value=''}
 const editing = ref(false), saving = ref(false), notice = ref(''), reason = ref('')
 const categories = ref([]), tags = ref([]), attachments=ref([])
 const fields = ref({title:'',summary:'',content:'',category_id:'',tag_ids:[],visibility:'public'})
@@ -68,7 +71,7 @@ async function load() {
   const current = ++generation, id = props.postId, status = filter.value
   loading.value = true; paging.value = false; saving.value=false;editing.value=false;notice.value='';reason.value=''; error.value = ''; snapshot.value = null; posts.value = []; cursor.value = ''
   try {
-    const result = id ? await api.ownPost(id) : await api.ownPosts(status)
+    const result = id ? await api.ownPost(id) : await api.ownPosts(status,'',{q:activeSearch.value,kind:kindFilter.value})
     if (current !== generation) return
     if (id) snapshot.value = result.data
     else { posts.value = result.data || []; cursor.value = result.page?.next_cursor || '' }
@@ -80,7 +83,7 @@ async function loadMore() {
   const current = generation, next = cursor.value, status = filter.value
   paging.value = true; error.value = ''
   try {
-    const result = await api.ownPosts(status, next)
+    const result = await api.ownPosts(status, next,{q:activeSearch.value,kind:kindFilter.value})
     if (current !== generation) return
     const seen = new Set(posts.value.map(post => post.id))
     posts.value.push(...(result.data || []).filter(post => !seen.has(post.id) && seen.add(post.id)))
@@ -88,13 +91,14 @@ async function loadMore() {
   } catch (e) { if (current === generation) error.value = e.message }
   finally { if (current === generation) paging.value = false }
 }
-watch(() => [props.postId,filter.value], load, {immediate:true})
+watch(() => [props.postId,filter.value,activeSearch.value,kindFilter.value], load, {immediate:true})
 </script>
 
 <template>
   <section class="section-page author-workspace" :aria-busy="loading" aria-labelledby="author-heading">
     <div class="section-heading"><h1 id="author-heading" ref="heading" tabindex="-1">{{ postId ? '稿件详情' : '我的稿件' }}</h1><button v-if="postId" class="text-button" @click="emit('back')">返回我的稿件</button><button v-else class="outline" :disabled="loading" @click="reload">刷新稿件</button></div>
     <p class="muted-copy">草稿仅自己可见。可以保存修改、提交审核，或撤回待审稿件继续编辑。</p><button v-if="!postId" class="primary" @click="emit('create')">写新稿件</button><p v-if="notice" role="status">{{notice}}</p>
+    <form v-if="!postId" class="author-search" @submit.prevent="searchOwned"><label for="author-search-term">搜索我的稿件<input id="author-search-term" v-model="searchText" maxlength="100" placeholder="标题、摘要或正文"></label><label>类型<select v-model="kindFilter"><option value="">全部类型</option><option value="article">文章</option><option value="image">图文</option><option value="video">视频</option><option value="repost">转发</option></select></label><button class="outline" :disabled="loading">搜索</button><button v-if="activeSearch||kindFilter||filter" type="button" class="text-button" @click="clearOwnedSearch">清空筛选</button></form><p v-if="!postId&&activeSearch">正在查找“{{activeSearch}}”，仅搜索当前账号的稿件。</p>
     <label v-if="!postId" class="submission-filter" for="submission-status">稿件状态<select id="submission-status" v-model="filter"><option v-for="[value,label] in states" :key="value" :value="value">{{ label }}</option></select></label>
     <p v-if="loading" role="status">正在加载稿件…</p>
     <p v-if="error" class="form-error" role="alert">{{ error }}</p>
@@ -138,5 +142,5 @@ watch(() => [props.postId,filter.value], load, {immediate:true})
 </template>
 
 <style scoped>
-.author-attachment-editor{border:1px solid var(--line,#ddd);border-radius:10px;padding:16px}.author-attachment-editor ol{padding:0;list-style:none}.author-attachment-editor li{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap}.author-attachment-editor li span{flex:1;min-width:140px;overflow-wrap:anywhere}.author-attachment-editor button{padding:6px;border:1px solid var(--line,#ddd);border-radius:6px}.author-attachment-editor small{color:var(--muted,#777)}
+.author-search{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:20px 0}.author-search input,.author-search select{display:block;padding:9px;border:1px solid var(--line,#ddd);border-radius:8px;margin-top:6px}.author-attachment-editor{border:1px solid var(--line,#ddd);border-radius:10px;padding:16px}.author-attachment-editor ol{padding:0;list-style:none}.author-attachment-editor li{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap}.author-attachment-editor li span{flex:1;min-width:140px;overflow-wrap:anywhere}.author-attachment-editor button{padding:6px;border:1px solid var(--line,#ddd);border-radius:6px}.author-attachment-editor small{color:var(--muted,#777)}
 </style>

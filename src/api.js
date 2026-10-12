@@ -138,13 +138,14 @@ export const api = {
   ,followCategory: (id,followed) => request(`/categories/${encodeURIComponent(id)}/follow`, { method:followed?'DELETE':'PUT' })
   ,categoryFollows: (cursor='') => request(`/me/category-follows?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
   ,sessions: () => request('/me/sessions')
+  ,renameSession: (id,name) => request(`/me/sessions/${encodeURIComponent(id)}`,{method:'PATCH',body:JSON.stringify({name})})
   ,revokeSession: id => request(`/me/sessions/${encodeURIComponent(id)}`, { method:'DELETE' })
   ,notifications: (cursor='', { type='', unread=false }={}) => { const params=new URLSearchParams({limit:'30'});if(type)params.set('type',type);if(unread)params.set('unread','true');if(cursor)params.set('cursor',cursor);return request(`/notifications?${params}`) }
   ,notificationCounts: () => request('/notifications/counts')
   ,notificationPreferences: () => request('/me/notification-preferences')
   ,updateNotificationPreferences: preferences => request('/me/notification-preferences', {method:'PATCH',body:JSON.stringify({preferences})})
   ,conversationCounts: () => request('/conversations/counts')
-  ,ownPosts: async (status='',cursor='') => { const params=new URLSearchParams({limit:'20'});if(status)params.set('status',status);if(cursor)params.set('cursor',cursor);const r=await request(`/me/posts?${params}`);return {...r,data:(r.data||[]).map(normalizePost)} }
+  ,ownPosts: async (status='',cursor='',{q='',kind=''}={}) => { const params=new URLSearchParams({limit:'20'});if(status)params.set('status',status);if(cursor)params.set('cursor',cursor);if(q)params.set('q',q);if(kind)params.set('kind',kind);const r=await request(`/me/posts?${params}`);return {...r,data:(r.data||[]).map(normalizePost)} }
   ,transitionSubmission: async (id,version,action,reason) => { const r=await request(`/me/posts/${encodeURIComponent(id)}/review`,{method:'POST',headers:{'If-Match':`"${version}"`},body:JSON.stringify({action,reason})});return {...r,data:normalizePost(r.data)} }
   ,ownPost: async id => { const r=await request(`/me/posts/${encodeURIComponent(id)}`);return {...r,data:{...r.data,post:normalizePost(r.data.post)}} }
   ,readNotifications: ids => request('/notifications/read', { method: 'PUT', body: JSON.stringify({ ids }) })
@@ -170,6 +171,10 @@ export const api = {
   ,revokeUserSessions: (id,reason) => request(`/admin/users/${encodeURIComponent(id)}/sessions/revoke`,{method:'POST',body:JSON.stringify({reason})})
   ,adminUsers: ({status='',role='',q='',cursor=''}={}) => { const params=new URLSearchParams({limit:'50'});if(status)params.set('status',status);if(role)params.set('role',role);if(q)params.set('q',q);if(cursor)params.set('cursor',cursor);return request(`/admin/users?${params}`) }
   ,setUserStatus: (id,status,reason,expectedStatus) => request(`/admin/users/${encodeURIComponent(id)}/status`, { method: 'PATCH', body: JSON.stringify({ status, reason, ...(expectedStatus?{expected_status:expectedStatus}:{}) }) })
+  ,removeReviewedPost: (id,version,reason) => request(`/admin/posts/${encodeURIComponent(id)}/remove`,{method:'POST',headers:{'If-Match':`"${version}"`},body:JSON.stringify({reason})})
+  ,adminComment: id => request(`/admin/comments/${encodeURIComponent(id)}`)
+  ,removeReviewedComment: (id,version,reason) => request(`/admin/comments/${encodeURIComponent(id)}/remove`,{method:'POST',headers:{'If-Match':`"${version}"`},body:JSON.stringify({reason})})
+  ,commentModerationHistory: (id,cursor='') => request(`/admin/comments/${encodeURIComponent(id)}/moderation-history?limit=20&cursor=${encodeURIComponent(cursor)}`)
   ,adminContent: ({status='published',type='',q=''}={},cursor='') => request(`/admin/content?status=${encodeURIComponent(status)}&type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}&limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
   ,adminSubmission: async id => {const r=await request(`/admin/posts/${encodeURIComponent(id)}`);return {...r,data:{...r.data,post:normalizePost(r.data.post)}}}
   ,submissionHistory: (id,cursor='') => request(`/admin/posts/${encodeURIComponent(id)}/review-history?limit=20${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
