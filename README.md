@@ -48,8 +48,9 @@ states, derived category/topic sidebars, and protection against late post-detail
 responses overwriting a newer destination. Sidebar topics come from loaded
 posts, not invented popularity counts.
 
-Historical design notes are in `DESIGN-REVIEW.md`. The current icon refresh uses
-the official Hugeicons packages; their licenses are included under `licenses/`.
+Historical validation notes are in `DESIGN-REVIEW.md`. The current Hugeicons
+refresh, package licenses, fresh browser screenshots and test results are
+documented in `HUGEICONS-REVIEW.md`.
 
 ## Inbox and author workspace
 
@@ -58,10 +59,11 @@ filters, separate notification/chat counts, conversation unread badges, and a
 private “我的稿件” workspace. Choose “提交审核” in the composer to submit a pending
 post; review outcomes are available only through the author's private snapshot.
 
-The reviewed October 11 checkpoint passed 109 adapter/component tests, a
-production build, and three live scenarios against the paired Go API, including
-private PNG/MP4 access and session/inbox regressions. Browser tests were blocked
-at Chromium launch; browser layout, playback and fresh screenshots remain
-unverified. Historical screenshots do not verify this continuation. Run the
-isolated live checks with
+See `INTEGRATION-REVIEW.md` for provenance, live API contract coverage and the
+current browser-launch blocker. The historical Hugeicons screenshots do not
+verify this continuation. Run the isolated live checks with
 `GO=/path/to/go ./scripts/test-local-api.sh --api-contract`.
+
+### Author submission flow (October 12)
+
+Composer can save a server draft. The author workspace now edits draft/rejected/published content, saves with If-Match, submits/re-submits with a reason, withdraws pending review before editing and deletes non-pending private drafts. Moderation queue filters include pending/rejected and display submission text. Requires the matching `/me/posts/{id}/review` backend. Vite build passed; browser/full regression acceptance has not run in this feature-first pass.

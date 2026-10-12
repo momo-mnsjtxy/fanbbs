@@ -129,3 +129,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
   .notification-preferences { padding: 16px; }
   .inbox-page .message-tabs { order: 2; flex-basis: 100%; }
 }
+
+.author-edit-form{margin:1.2rem 0;padding:1.2rem;border:1px solid var(--line,#e4e7ec);border-radius:16px}.author-edit-form label,.submission-actions label{display:grid;gap:.5rem}.author-edit-form textarea,.author-edit-form input,.submission-actions textarea{width:100%;box-sizing:border-box}.submission-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.8rem;margin:1rem 0}.submission-actions label{flex:1 0 100%}.submission-actions textarea{min-height:80px}.author-edit-form .compose-grid{margin:1rem 0}

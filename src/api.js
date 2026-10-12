@@ -145,6 +145,7 @@ export const api = {
   ,updateNotificationPreferences: preferences => request('/me/notification-preferences', {method:'PATCH',body:JSON.stringify({preferences})})
   ,conversationCounts: () => request('/conversations/counts')
   ,ownPosts: async (status='',cursor='') => { const params=new URLSearchParams({limit:'20'});if(status)params.set('status',status);if(cursor)params.set('cursor',cursor);const r=await request(`/me/posts?${params}`);return {...r,data:(r.data||[]).map(normalizePost)} }
+  ,transitionSubmission: async (id,version,action,reason) => { const r=await request(`/me/posts/${encodeURIComponent(id)}/review`,{method:'POST',headers:{'If-Match':`"${version}"`},body:JSON.stringify({action,reason})});return {...r,data:normalizePost(r.data)} }
   ,ownPost: async id => { const r=await request(`/me/posts/${encodeURIComponent(id)}`);return {...r,data:{...r.data,post:normalizePost(r.data.post)}} }
   ,readNotifications: ids => request('/notifications/read', { method: 'PUT', body: JSON.stringify({ ids }) })
   ,report: (targetType, targetId, reason) => request('/reports', { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({ target_type: targetType, target_id: targetId, reason }) })
