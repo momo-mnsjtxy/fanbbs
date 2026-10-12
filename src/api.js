@@ -117,7 +117,7 @@ export const api = {
   ,updateProfile: input => request('/me/profile', { method: 'PATCH', body: JSON.stringify(input) })
   ,categories: () => request('/categories')
   ,tags: () => request('/tags')
-  ,search: async q => { const r = await request(`/search?q=${encodeURIComponent(q)}&type=all`); return { ...r, data: { ...r.data, posts: (r.data?.posts || r.data || []).map(normalizePost) } } }
+  ,search: async (q,{type='all',cursor=''}={}) => { const params=new URLSearchParams({q,type,limit:'20'});if(cursor)params.set('cursor',cursor);const r = await request(`/search?${params}`); return { ...r, data: { ...r.data, posts: (r.data?.posts || r.data || []).map(normalizePost) } } }
   ,bookmarks: async (cursor='') => { const r = await request(`/me/bookmarks?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`); return { ...r, data: (r.data || []).map(normalizePost) } }
   ,collections: (cursor='') => request(`/me/collections?limit=30${cursor?`&cursor=${encodeURIComponent(cursor)}`:''}`)
   ,createCollection: input => request('/me/collections',{method:'POST',body:JSON.stringify(input)})
